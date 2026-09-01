@@ -55,6 +55,17 @@ public class LinkHealthMonitorService {
         String errorMessage;
         long duration;
 
+        // SSRF Koruması: Yerel veya özel ağ adreslerine istek gönderme
+        if (!com.urlshortener.util.SecurityUtils.isPubliclyAccessibleUrl(targetUrl)) {
+            log.warn("🚨 [Health Monitor SSRF Engeli] Özel ağ adresi taranmadı: {}", targetUrl);
+            mapping.setHealthStatus("BROKEN");
+            mapping.setLastHealthCheck(System.currentTimeMillis());
+            mapping.setHealthStatusCode(0);
+            mapping.setHealthErrorMessage("Güvenlik Engeli: Yerel/Özel ağ adresleri (SSRF) taranamaz");
+            mapping.setHealthResponseTimeMs(0L);
+            return urlMappingRepository.save(mapping);
+        }
+
         try {
             URI uri = URI.create(targetUrl);
             

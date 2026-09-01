@@ -48,6 +48,12 @@ public class UrlSecurityScannerService {
 
         String targetUrl = url.trim();
 
+        // 0. SSRF / Private Network & Cloud Metadata Check
+        if (!com.urlshortener.util.SecurityUtils.isPubliclyAccessibleUrl(targetUrl)) {
+            log.warn("🚨 [SSRF Koruması] Özel/Yerel ağ veya bulut meta-veri adresi engellendi: {}", targetUrl);
+            throw new MaliciousUrlException("Güvenlik Uyarısı: Yerel veya özel ağ IP adreslerine (SSRF) bağlantı oluşturulamaz.");
+        }
+
         // 1. Local / Offline Threat Pattern Check
         checkLocalThreatPatterns(targetUrl);
 

@@ -244,9 +244,36 @@ public class UrlShortenerService {
             return resolveTargetByDevice(mapping, request);
         }
 
+        String clientIp = getClientIp(request);
+        String rateKey = "pw_attempt:" + shortCode + ":" + clientIp;
+        try {
+            Object attemptsObj = redisTemplate.opsForValue().get(rateKey);
+            if (attemptsObj != null) {
+                int attempts = Integer.parseInt(attemptsObj.toString());
+                if (attempts >= 5) {
+                    log.warn("🚨 [Şifre Brute-Force Engeli] Çok fazla hatalı deneme! IP: {}, Link: {}", clientIp, shortCode);
+                    throw new IllegalArgumentException("Çok fazla hatalı şifre denemesi yaptınız. Lütfen 5 dakika sonra tekrar deneyin.");
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.debug("Redis şifre deneme kontrolü atlandı: {}", e.getMessage());
+        }
+
         if (password == null || !passwordEncoder.matches(password, mapping.getPasswordHash())) {
+            try {
+                Long count = redisTemplate.opsForValue().increment(rateKey);
+                if (count != null && count == 1) {
+                    redisTemplate.expire(rateKey, java.time.Duration.ofMinutes(5));
+                }
+            } catch (Exception ignored) {}
             throw new IllegalArgumentException(messageService.getMessage("url.password_invalid"));
         }
+
+        try {
+            redisTemplate.delete(rateKey);
+        } catch (Exception ignored) {}
 
         publishClickEvent(shortCode, request);
         return resolveTargetByDevice(mapping, request);

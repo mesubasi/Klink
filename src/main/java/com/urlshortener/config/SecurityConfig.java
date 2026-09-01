@@ -50,7 +50,11 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
+            .headers(headers -> headers
+                .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
+                .contentTypeOptions(org.springframework.security.config.Customizer.withDefaults())
+                .referrerPolicy(referrer -> referrer.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+            )
             .authorizeHttpRequests(auth -> auth
                 // Public Yönlendirme, Önizleme ve Link-in-Bio Endpoint'leri
                 .requestMatchers(HttpMethod.GET, "/{shortCode:[a-zA-Z0-9_-]{3,20}}", "/{shortCode:[a-zA-Z0-9_-]{3,20}}+", "/preview/**", "/bio/**").permitAll()

@@ -233,6 +233,9 @@ public class DynamicQrCodeService {
         if (hex == null || hex.isBlank()) return defaultHex;
         String clean = hex.trim();
         if (!clean.startsWith("#")) clean = "#" + clean;
-        return clean;
+        if (clean.matches("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")) {
+            return clean;
+        }
+        return defaultHex;
     }
 }
