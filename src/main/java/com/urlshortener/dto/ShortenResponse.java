@@ -15,26 +15,35 @@ public class ShortenResponse {
     private String androidUrl;
     private String desktopUrl;
     private String webhookUrl;
+    private String healthStatus;
+    private Long lastHealthCheck;
+    private Integer healthStatusCode;
+    private String healthErrorMessage;
+    private Long healthResponseTimeMs;
 
     public ShortenResponse() {}
 
     public ShortenResponse(String shortCode, String shortUrl, String originalUrl, Long createdAt, Long expiresAt, Long clickCount, boolean passwordProtected) {
-        this(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, null, null, false, null, null, null, null);
+        this(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, null, null, false, null, null, null, null, "UNKNOWN", null, null, null, null);
     }
 
     public ShortenResponse(String shortCode, String shortUrl, String originalUrl, Long createdAt, Long expiresAt, Long clickCount, boolean passwordProtected, String blockedCountries, String blockedIps) {
-        this(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, false, null, null, null, null);
+        this(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, false, null, null, null, null, "UNKNOWN", null, null, null, null);
     }
 
     public ShortenResponse(String shortCode, String shortUrl, String originalUrl, Long createdAt, Long expiresAt, Long clickCount, boolean passwordProtected, String blockedCountries, String blockedIps, boolean previewEnabled) {
-        this(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, null, null, null, null);
+        this(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, null, null, null, null, "UNKNOWN", null, null, null, null);
     }
 
     public ShortenResponse(String shortCode, String shortUrl, String originalUrl, Long createdAt, Long expiresAt, Long clickCount, boolean passwordProtected, String blockedCountries, String blockedIps, boolean previewEnabled, String iosUrl, String androidUrl, String desktopUrl) {
-        this(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, null);
+        this(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, null, "UNKNOWN", null, null, null, null);
     }
 
     public ShortenResponse(String shortCode, String shortUrl, String originalUrl, Long createdAt, Long expiresAt, Long clickCount, boolean passwordProtected, String blockedCountries, String blockedIps, boolean previewEnabled, String iosUrl, String androidUrl, String desktopUrl, String webhookUrl) {
+        this(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, "UNKNOWN", null, null, null, null);
+    }
+
+    public ShortenResponse(String shortCode, String shortUrl, String originalUrl, Long createdAt, Long expiresAt, Long clickCount, boolean passwordProtected, String blockedCountries, String blockedIps, boolean previewEnabled, String iosUrl, String androidUrl, String desktopUrl, String webhookUrl, String healthStatus, Long lastHealthCheck, Integer healthStatusCode, String healthErrorMessage, Long healthResponseTimeMs) {
         this.shortCode = shortCode;
         this.shortUrl = shortUrl;
         this.originalUrl = originalUrl;
@@ -49,6 +58,11 @@ public class ShortenResponse {
         this.androidUrl = androidUrl;
         this.desktopUrl = desktopUrl;
         this.webhookUrl = webhookUrl;
+        this.healthStatus = healthStatus;
+        this.lastHealthCheck = lastHealthCheck;
+        this.healthStatusCode = healthStatusCode;
+        this.healthErrorMessage = healthErrorMessage;
+        this.healthResponseTimeMs = healthResponseTimeMs;
     }
 
     public static Builder builder() { return new Builder(); }
@@ -68,6 +82,11 @@ public class ShortenResponse {
         private String androidUrl;
         private String desktopUrl;
         private String webhookUrl;
+        private String healthStatus = "UNKNOWN";
+        private Long lastHealthCheck;
+        private Integer healthStatusCode;
+        private String healthErrorMessage;
+        private Long healthResponseTimeMs;
 
         public Builder shortCode(String shortCode) { this.shortCode = shortCode; return this; }
         public Builder shortUrl(String shortUrl) { this.shortUrl = shortUrl; return this; }
@@ -83,9 +102,14 @@ public class ShortenResponse {
         public Builder androidUrl(String androidUrl) { this.androidUrl = androidUrl; return this; }
         public Builder desktopUrl(String desktopUrl) { this.desktopUrl = desktopUrl; return this; }
         public Builder webhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; return this; }
+        public Builder healthStatus(String healthStatus) { this.healthStatus = healthStatus; return this; }
+        public Builder lastHealthCheck(Long lastHealthCheck) { this.lastHealthCheck = lastHealthCheck; return this; }
+        public Builder healthStatusCode(Integer healthStatusCode) { this.healthStatusCode = healthStatusCode; return this; }
+        public Builder healthErrorMessage(String healthErrorMessage) { this.healthErrorMessage = healthErrorMessage; return this; }
+        public Builder healthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; return this; }
 
         public ShortenResponse build() {
-            return new ShortenResponse(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl);
+            return new ShortenResponse(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, healthStatus, lastHealthCheck, healthStatusCode, healthErrorMessage, healthResponseTimeMs);
         }
     }
 
@@ -117,4 +141,14 @@ public class ShortenResponse {
     public void setDesktopUrl(String desktopUrl) { this.desktopUrl = desktopUrl; }
     public String getWebhookUrl() { return webhookUrl; }
     public void setWebhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; }
+    public String getHealthStatus() { return healthStatus; }
+    public void setHealthStatus(String healthStatus) { this.healthStatus = healthStatus; }
+    public Long getLastHealthCheck() { return lastHealthCheck; }
+    public void setLastHealthCheck(Long lastHealthCheck) { this.lastHealthCheck = lastHealthCheck; }
+    public Integer getHealthStatusCode() { return healthStatusCode; }
+    public void setHealthStatusCode(Integer healthStatusCode) { this.healthStatusCode = healthStatusCode; }
+    public String getHealthErrorMessage() { return healthErrorMessage; }
+    public void setHealthErrorMessage(String healthErrorMessage) { this.healthErrorMessage = healthErrorMessage; }
+    public Long getHealthResponseTimeMs() { return healthResponseTimeMs; }
+    public void setHealthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; }
 }

@@ -26,7 +26,7 @@ public class TotpServiceTest {
     public void testGetOtpAuthUrlAndQrCode() {
         String secret = totpService.generateSecretKey();
         String url = totpService.getOtpAuthUrl("testuser", secret);
-        assertTrue(url.contains("otpauth://totp/SwiftLink:testuser"));
+        assertTrue(url.contains("otpauth://totp/Klink:testuser"));
         assertTrue(url.contains("secret=" + secret));
 
         String qrBase64 = totpService.generateQrCodeBase64(url);

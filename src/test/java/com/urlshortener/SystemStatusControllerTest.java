@@ -53,6 +53,9 @@ public class SystemStatusControllerTest {
     @MockitoBean
     private RateLimitInterceptor rateLimitInterceptor;
 
+    @MockitoBean
+    private com.urlshortener.service.ApiKeyService apiKeyService;
+
     @org.junit.jupiter.api.BeforeEach
     public void setup() throws Exception {
         given(rateLimitInterceptor.preHandle(any(), any(), any())).willReturn(true);

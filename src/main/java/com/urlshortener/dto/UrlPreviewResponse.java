@@ -21,6 +21,11 @@ public class UrlPreviewResponse {
     private String androidUrl;
     private String desktopUrl;
     private String webhookUrl;
+    private String healthStatus;
+    private Long lastHealthCheck;
+    private Integer healthStatusCode;
+    private String healthErrorMessage;
+    private Long healthResponseTimeMs;
 
     public UrlPreviewResponse() {}
 
@@ -29,7 +34,7 @@ public class UrlPreviewResponse {
                               String virusTotalStatus, boolean passwordProtected, boolean previewEnabled,
                               Long createdAt, Long expiresAt, Long clickCount, boolean active,
                               String iosUrl, String androidUrl, String desktopUrl) {
-        this(shortCode, shortUrl, originalUrl, domain, protocol, secure, safetyStatus, safetyScore, googleSafeBrowsingStatus, virusTotalStatus, passwordProtected, previewEnabled, createdAt, expiresAt, clickCount, active, iosUrl, androidUrl, desktopUrl, null);
+        this(shortCode, shortUrl, originalUrl, domain, protocol, secure, safetyStatus, safetyScore, googleSafeBrowsingStatus, virusTotalStatus, passwordProtected, previewEnabled, createdAt, expiresAt, clickCount, active, iosUrl, androidUrl, desktopUrl, null, "UNKNOWN", null, null, null, null);
     }
 
     public UrlPreviewResponse(String shortCode, String shortUrl, String originalUrl, String domain, String protocol,
@@ -37,6 +42,15 @@ public class UrlPreviewResponse {
                               String virusTotalStatus, boolean passwordProtected, boolean previewEnabled,
                               Long createdAt, Long expiresAt, Long clickCount, boolean active,
                               String iosUrl, String androidUrl, String desktopUrl, String webhookUrl) {
+        this(shortCode, shortUrl, originalUrl, domain, protocol, secure, safetyStatus, safetyScore, googleSafeBrowsingStatus, virusTotalStatus, passwordProtected, previewEnabled, createdAt, expiresAt, clickCount, active, iosUrl, androidUrl, desktopUrl, webhookUrl, "UNKNOWN", null, null, null, null);
+    }
+
+    public UrlPreviewResponse(String shortCode, String shortUrl, String originalUrl, String domain, String protocol,
+                              boolean secure, String safetyStatus, int safetyScore, String googleSafeBrowsingStatus,
+                              String virusTotalStatus, boolean passwordProtected, boolean previewEnabled,
+                              Long createdAt, Long expiresAt, Long clickCount, boolean active,
+                              String iosUrl, String androidUrl, String desktopUrl, String webhookUrl,
+                              String healthStatus, Long lastHealthCheck, Integer healthStatusCode, String healthErrorMessage, Long healthResponseTimeMs) {
         this.shortCode = shortCode;
         this.shortUrl = shortUrl;
         this.originalUrl = originalUrl;
@@ -57,6 +71,11 @@ public class UrlPreviewResponse {
         this.androidUrl = androidUrl;
         this.desktopUrl = desktopUrl;
         this.webhookUrl = webhookUrl;
+        this.healthStatus = healthStatus;
+        this.lastHealthCheck = lastHealthCheck;
+        this.healthStatusCode = healthStatusCode;
+        this.healthErrorMessage = healthErrorMessage;
+        this.healthResponseTimeMs = healthResponseTimeMs;
     }
 
     public static Builder builder() {
@@ -84,6 +103,11 @@ public class UrlPreviewResponse {
         private String androidUrl;
         private String desktopUrl;
         private String webhookUrl;
+        private String healthStatus = "UNKNOWN";
+        private Long lastHealthCheck;
+        private Integer healthStatusCode;
+        private String healthErrorMessage;
+        private Long healthResponseTimeMs;
 
         public Builder shortCode(String shortCode) { this.shortCode = shortCode; return this; }
         public Builder shortUrl(String shortUrl) { this.shortUrl = shortUrl; return this; }
@@ -105,11 +129,17 @@ public class UrlPreviewResponse {
         public Builder androidUrl(String androidUrl) { this.androidUrl = androidUrl; return this; }
         public Builder desktopUrl(String desktopUrl) { this.desktopUrl = desktopUrl; return this; }
         public Builder webhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; return this; }
+        public Builder healthStatus(String healthStatus) { this.healthStatus = healthStatus; return this; }
+        public Builder lastHealthCheck(Long lastHealthCheck) { this.lastHealthCheck = lastHealthCheck; return this; }
+        public Builder healthStatusCode(Integer healthStatusCode) { this.healthStatusCode = healthStatusCode; return this; }
+        public Builder healthErrorMessage(String healthErrorMessage) { this.healthErrorMessage = healthErrorMessage; return this; }
+        public Builder healthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; return this; }
 
         public UrlPreviewResponse build() {
             return new UrlPreviewResponse(shortCode, shortUrl, originalUrl, domain, protocol, secure, safetyStatus,
                     safetyScore, googleSafeBrowsingStatus, virusTotalStatus, passwordProtected, previewEnabled,
-                    createdAt, expiresAt, clickCount, active, iosUrl, androidUrl, desktopUrl, webhookUrl);
+                    createdAt, expiresAt, clickCount, active, iosUrl, androidUrl, desktopUrl, webhookUrl,
+                    healthStatus, lastHealthCheck, healthStatusCode, healthErrorMessage, healthResponseTimeMs);
         }
     }
 
@@ -172,4 +202,19 @@ public class UrlPreviewResponse {
 
     public String getWebhookUrl() { return webhookUrl; }
     public void setWebhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; }
+
+    public String getHealthStatus() { return healthStatus; }
+    public void setHealthStatus(String healthStatus) { this.healthStatus = healthStatus; }
+
+    public Long getLastHealthCheck() { return lastHealthCheck; }
+    public void setLastHealthCheck(Long lastHealthCheck) { this.lastHealthCheck = lastHealthCheck; }
+
+    public Integer getHealthStatusCode() { return healthStatusCode; }
+    public void setHealthStatusCode(Integer healthStatusCode) { this.healthStatusCode = healthStatusCode; }
+
+    public String getHealthErrorMessage() { return healthErrorMessage; }
+    public void setHealthErrorMessage(String healthErrorMessage) { this.healthErrorMessage = healthErrorMessage; }
+
+    public Long getHealthResponseTimeMs() { return healthResponseTimeMs; }
+    public void setHealthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; }
 }

@@ -322,6 +322,22 @@ export default function PreviewPage() {
                   </div>
                 </div>
 
+                {/* Destination Health Check Alert (if broken) */}
+                {data.healthStatus === 'BROKEN' && (
+                  <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-900 text-xs flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-red-950">
+                        {lang === 'tr' ? '⚠️ Dikkat: Hedef Web Sitesi Yanıt Vermiyor (Kırık Link)' : '⚠️ Warning: Target Destination is Unreachable (Broken Link)'}
+                      </p>
+                      <p className="text-red-700 text-[11px] mt-0.5">
+                        {data.healthErrorMessage ? `Durum: ${data.healthErrorMessage}. ` : ''}
+                        {lang === 'tr' ? 'Hedef sunucuya erişilemedi veya sayfa bulunamadı (404/500/timeout).' : 'Destination server is down or page not found.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Safety Warning Notice */}
                 <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/70 text-amber-900 text-xs flex items-start gap-2.5">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />

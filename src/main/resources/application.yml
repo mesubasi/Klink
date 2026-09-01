@@ -5,7 +5,7 @@ spring:
   application:
     name: klink-url-shortener
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:prod}
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
   datasource:
     url: ${DATABASE_URL:jdbc:h2:mem:klinkdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}

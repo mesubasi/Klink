@@ -44,6 +44,7 @@ export default function UserDashboardPage() {
 
   const [links, setLinks] = useState<ShortenResponse[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
+  const [scanningAll, setScanningAll] = useState(false);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
 
   // Modal States
@@ -103,6 +104,23 @@ export default function UserDashboardPage() {
     }
   };
 
+  const handleScanAllHealth = async () => {
+    if (!authUser) return;
+    setScanningAll(true);
+    try {
+      const data = await ApiClient.checkAllLinksHealth(lang, authUser as any);
+      setLinks(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setScanningAll(false);
+    }
+  };
+
+  const handleLinkUpdated = (updated: ShortenResponse) => {
+    setLinks((prev) => prev.map((l) => (l.shortCode === updated.shortCode ? updated : l)));
+  };
+
   useEffect(() => {
     fetchUserData();
     fetchMyLinks();
@@ -134,6 +152,8 @@ export default function UserDashboardPage() {
   const totalClicks = links.reduce((acc, curr) => acc + (curr.clickCount || 0), 0);
   const activeCount = links.length;
   const protectedCount = links.filter((l) => l.passwordProtected).length;
+  const brokenCount = links.filter((l) => l.healthStatus === 'BROKEN').length;
+  const healthyCount = links.filter((l) => l.healthStatus === 'HEALTHY').length;
 
   if (!authChecked || !authUser) {
     return (
@@ -172,7 +192,19 @@ export default function UserDashboardPage() {
             <span className="font-bold text-zinc-950">{lang === 'tr' ? 'Link Yönetim Paneli' : 'Link Dashboard'}</span>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleScanAllHealth}
+              disabled={scanningAll || links.length === 0}
+              className="text-xs h-8 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 border-emerald-200 cursor-pointer"
+              title="Tüm linklerin sağlık kontrolünü yap"
+            >
+              <Activity className={`w-3.5 h-3.5 mr-1 ${scanningAll ? 'animate-spin' : 'text-emerald-600'}`} />
+              <span>{scanningAll ? t.btnScanning : t.btnScanAll}</span>
+            </Button>
+
             <Button
               variant={is2FAEnabled ? "secondary" : "outline"}
               size="sm"
@@ -230,18 +262,30 @@ export default function UserDashboardPage() {
             </div>
           </div>
 
-          {/* Card 3: Active Links */}
+          {/* Card 3: Link Health Status */}
           <div className="p-4 sm:p-5 rounded-2xl bg-white border border-zinc-200/90 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-zinc-500">{t.cardActiveLinks}</p>
-              <div className="w-8 h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center">
-                <Zap className="w-4 h-4" />
+              <p className="text-xs font-semibold text-zinc-500">{lang === 'tr' ? 'Link Sağlığı' : 'Link Health'}</p>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${brokenCount > 0 ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
+                <Activity className="w-4 h-4" />
               </div>
             </div>
             <div>
-              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950">{activeCount}</h4>
+              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950">
+                {brokenCount > 0 ? (
+                  <span className="text-red-600 flex items-center gap-1.5">
+                    {brokenCount} <span className="text-xs font-semibold uppercase text-red-600">{t.healthBroken}</span>
+                  </span>
+                ) : (
+                  <span>{healthyCount > 0 ? `${healthyCount}/${links.length}` : (links.length > 0 ? links.length : 0)}</span>
+                )}
+              </h4>
               <p className="text-[11px] text-zinc-400 font-medium mt-0.5">
-                {lang === 'tr' ? '%100 Erişilebilir' : '100% Online'}
+                {brokenCount > 0 
+                  ? (lang === 'tr' ? '⚠️ Kırık linkler tespit edildi' : '⚠️ Broken links detected')
+                  : (healthyCount > 0 
+                      ? (lang === 'tr' ? 'Tüm kontrol edilenler aktif' : 'All checked links healthy')
+                      : (lang === 'tr' ? '%100 Erişilebilir' : '100% Online'))}
               </p>
             </div>
           </div>
@@ -305,11 +349,13 @@ export default function UserDashboardPage() {
             <MyLinksTable
               lang={lang}
               links={links}
+              authUser={authUser}
               onToggleStatus={handleToggleStatus}
               onOpenQr={(shortCode) => setQrCodeModal(shortCode)}
               onOpenPasswordModal={(shortCode) => setPasswordModal(shortCode)}
               onOpenAnalyticsModal={(shortCode) => setAnalyticsModal(shortCode)}
               onDeleteLink={handleDeleteLink}
+              onLinkUpdated={handleLinkUpdated}
             />
           </TabsContent>
 
@@ -318,11 +364,13 @@ export default function UserDashboardPage() {
             <MyLinksTable
               lang={lang}
               links={links}
+              authUser={authUser}
               onToggleStatus={handleToggleStatus}
               onOpenQr={(shortCode) => setQrCodeModal(shortCode)}
               onOpenPasswordModal={(shortCode) => setPasswordModal(shortCode)}
               onOpenAnalyticsModal={(shortCode) => setAnalyticsModal(shortCode)}
               onDeleteLink={handleDeleteLink}
+              onLinkUpdated={handleLinkUpdated}
             />
           </TabsContent>
 

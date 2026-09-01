@@ -56,6 +56,9 @@ public class LocalizationTest {
     @MockitoBean
     private RateLimitInterceptor rateLimitInterceptor;
 
+    @MockitoBean
+    private com.urlshortener.service.ApiKeyService apiKeyService;
+
     @BeforeEach
     public void setup() throws Exception {
         given(rateLimitInterceptor.preHandle(any(), any(), any())).willReturn(true);

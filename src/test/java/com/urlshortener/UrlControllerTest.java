@@ -70,6 +70,9 @@ public class UrlControllerTest {
     @MockitoBean
     private RateLimitInterceptor rateLimitInterceptor;
 
+    @MockitoBean
+    private com.urlshortener.service.ApiKeyService apiKeyService;
+
     @BeforeEach
     public void setup() throws Exception {
         given(rateLimitInterceptor.preHandle(any(), any(), any())).willReturn(true);
@@ -172,7 +175,7 @@ public class UrlControllerTest {
 
         mockMvc.perform(get("/api/v1/urls/analytics/mygoogle/export?format=csv"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Content-Disposition", "attachment; filename=\"analytics-mygoogle.csv\""))
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"klink-analytics-mygoogle.csv\""))
                 .andExpect(content().bytes(fakeCsv));
     }
 
@@ -245,5 +248,28 @@ public class UrlControllerTest {
                 .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.originalUrl").value("https://example.com/target"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    public void testCheckHealthSuccess() throws Exception {
+        ShortenResponse response = ShortenResponse.builder()
+                .shortCode("healthCode")
+                .shortUrl("http://localhost:8080/healthCode")
+                .originalUrl("https://example.com")
+                .healthStatus("HEALTHY")
+                .healthStatusCode(200)
+                .healthErrorMessage("200 OK (55ms)")
+                .healthResponseTimeMs(55L)
+                .build();
+
+        given(urlShortenerService.checkHealth(eq("healthCode"))).willReturn(response);
+
+        mockMvc.perform(post("/api/v1/urls/healthCode/health-check")
+                .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shortCode").value("healthCode"))
+                .andExpect(jsonPath("$.healthStatus").value("HEALTHY"))
+                .andExpect(jsonPath("$.healthStatusCode").value(200));
     }
 }

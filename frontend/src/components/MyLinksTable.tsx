@@ -18,10 +18,16 @@ import {
   Sparkles,
   Link2,
   Smartphone,
-  Webhook
+  Webhook,
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Clock
 } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
 import { ShortenResponse } from '@/lib/types';
+import { ApiClient } from '@/lib/api';
 import {
   Table,
   TableBody,
@@ -38,26 +44,31 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 interface MyLinksTableProps {
   lang: Language;
   links: ShortenResponse[];
+  authUser?: { u?: string; p?: string; token?: string } | null;
   onToggleStatus: (shortCode: string, currentActive: boolean) => void;
   onOpenQr: (shortCode: string) => void;
   onOpenPasswordModal: (shortCode: string) => void;
   onOpenAnalyticsModal: (shortCode: string) => void;
   onDeleteLink: (shortCode: string) => void;
+  onLinkUpdated?: (updated: ShortenResponse) => void;
 }
 
 export const MyLinksTable: React.FC<MyLinksTableProps> = ({
   lang,
   links,
+  authUser,
   onOpenQr,
   onOpenPasswordModal,
   onOpenAnalyticsModal,
   onDeleteLink,
+  onLinkUpdated,
 }) => {
   const t = translations[lang];
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'protected' | 'preview'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'protected' | 'preview' | 'broken'>('all');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [checkingCode, setCheckingCode] = useState<string | null>(null);
 
   const getDomainName = (url: string) => {
     try {
@@ -65,6 +76,20 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
       return parsed.hostname.replace('www.', '');
     } catch {
       return 'link';
+    }
+  };
+
+  const handleCheckHealth = async (shortCode: string) => {
+    setCheckingCode(shortCode);
+    try {
+      const updated = await ApiClient.checkLinkHealth(shortCode, lang, authUser);
+      if (onLinkUpdated) {
+        onLinkUpdated(updated);
+      }
+    } catch (err) {
+      console.error('Health check failed:', err);
+    } finally {
+      setCheckingCode(null);
     }
   };
 
@@ -77,6 +102,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
       if (!matchesSearch) return false;
       if (filterType === 'protected') return !!link.passwordProtected;
       if (filterType === 'preview') return !!link.previewEnabled;
+      if (filterType === 'broken') return link.healthStatus === 'BROKEN';
       return true;
     });
 
@@ -87,6 +113,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
   };
 
   const maxClicks = Math.max(...links.map((l) => l.clickCount || 0), 1);
+  const brokenCount = links.filter((l) => l.healthStatus === 'BROKEN').length;
 
   return (
     <Card className="border-zinc-200/90 shadow-sm overflow-hidden">
@@ -98,9 +125,15 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
               <Badge variant="secondary" className="font-mono text-xs">
                 {filteredLinks.length}
               </Badge>
+              {brokenCount > 0 && (
+                <Badge variant="destructive" className="font-mono text-[11px] gap-1 animate-pulse">
+                  <AlertTriangle className="w-3 h-3" />
+                  <span>{brokenCount} {t.healthBroken}</span>
+                </Badge>
+              )}
             </div>
             <CardDescription className="text-xs mt-0.5 text-zinc-500">
-              {lang === 'tr' ? 'Hesabınızdaki tüm aktif bağlantılar ve tıklama kayıtları' : 'All active shortened links and telemetry'}
+              {lang === 'tr' ? 'Hesabınızdaki tüm aktif bağlantılar, sağlık durumu ve tıklama kayıtları' : 'All active shortened links, health telemetry, and analytics'}
             </CardDescription>
           </div>
 
@@ -115,7 +148,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                   filterType === 'all' ? 'bg-white text-zinc-950 shadow-2xs font-bold' : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
-                {lang === 'tr' ? 'Tümü' : 'All'}
+                {t.filterAll || (lang === 'tr' ? 'Tümü' : 'All')}
               </button>
               <button
                 type="button"
@@ -124,7 +157,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                   filterType === 'protected' ? 'bg-white text-zinc-950 shadow-2xs font-bold' : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
-                {lang === 'tr' ? 'Şifreli' : 'Protected'}
+                {t.filterProtected || (lang === 'tr' ? 'Şifreli' : 'Protected')}
               </button>
               <button
                 type="button"
@@ -133,7 +166,22 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                   filterType === 'preview' ? 'bg-white text-zinc-950 shadow-2xs font-bold' : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
-                {lang === 'tr' ? 'Kalkanlı' : 'Shield'}
+                {t.filterPreview || (lang === 'tr' ? 'Kalkanlı' : 'Shield')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterType('broken')}
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                  filterType === 'broken' 
+                    ? 'bg-red-600 text-white shadow-2xs font-bold' 
+                    : brokenCount > 0 
+                      ? 'text-red-600 font-bold hover:bg-red-50' 
+                      : 'text-zinc-500 hover:text-zinc-900'
+                }`}
+              >
+                <AlertTriangle className="w-2.5 h-2.5" />
+                <span>{t.filterBroken || (lang === 'tr' ? 'Kırık Linkler' : 'Broken')}</span>
+                {brokenCount > 0 && <span className="text-[10px] px-1 bg-red-100 text-red-800 rounded-full">{brokenCount}</span>}
               </button>
             </div>
 
@@ -175,7 +223,9 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                       <Link2 className="w-5 h-5" />
                     </div>
                     <p className="text-xs text-zinc-600 font-semibold">
-                      {lang === 'tr' ? 'Kayıtlı bir kısa bağlantı bulunamadı.' : 'No short links found.'}
+                      {filterType === 'broken' 
+                        ? (lang === 'tr' ? 'Kırık bağlantı tespit edilmedi, tüm linkler sağlıklı!' : 'No broken links detected, all links are healthy!')
+                        : (lang === 'tr' ? 'Kayıtlı bir kısa bağlantı bulunamadı.' : 'No short links found.')}
                     </p>
                     <p className="text-[11px] text-zinc-400">
                       {lang === 'tr' ? 'Yukarıdaki alandan ilk linkinizi anında oluşturabilirsiniz.' : 'Create your first short link from the panel above.'}
@@ -220,20 +270,63 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                       </div>
                     </TableCell>
 
-                    {/* Target Destination URL with Domain Badge */}
-                    <TableCell className="max-w-xs truncate">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5">
+                    {/* Target Destination URL with Domain & Health Badges */}
+                    <TableCell className="max-w-xs">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-zinc-100 text-zinc-700 border border-zinc-200/70">
                             <Globe className="w-2.5 h-2.5 mr-1 text-zinc-400" />
                             {domain}
                           </span>
+
+                          {/* Link Health Badge */}
+                          {link.healthStatus === 'HEALTHY' && (
+                            <span 
+                              className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-emerald-50 text-emerald-700 border border-emerald-200" 
+                              title={link.healthErrorMessage || '200 OK'}
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5 mr-1 text-emerald-600" />
+                              <span>{link.healthStatusCode || 200} OK</span>
+                              {link.healthResponseTimeMs ? <span className="text-[9px] text-emerald-600/80 ml-1">({link.healthResponseTimeMs}ms)</span> : null}
+                            </span>
+                          )}
+
+                          {link.healthStatus === 'BROKEN' && (
+                            <span 
+                              className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-red-50 text-red-700 border border-red-200 animate-pulse" 
+                              title={link.healthErrorMessage || t.healthBroken}
+                            >
+                              <XCircle className="w-2.5 h-2.5 mr-1 text-red-600" />
+                              <span>{link.healthErrorMessage || t.healthBroken}</span>
+                            </span>
+                          )}
+
+                          {link.healthStatus === 'DEGRADED' && (
+                            <span 
+                              className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-amber-50 text-amber-800 border border-amber-200" 
+                              title={link.healthErrorMessage}
+                            >
+                              <AlertTriangle className="w-2.5 h-2.5 mr-1 text-amber-600" />
+                              <span>{link.healthStatusCode || 403} {t.healthDegraded}</span>
+                            </span>
+                          )}
+
+                          {(!link.healthStatus || link.healthStatus === 'UNKNOWN') && (
+                            <span 
+                              className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-zinc-100 text-zinc-500 border border-zinc-200" 
+                              title="Henüz taranmadı"
+                            >
+                              <Clock className="w-2.5 h-2.5 mr-1 text-zinc-400" />
+                              <span>{t.healthUnknown}</span>
+                            </span>
+                          )}
                         </div>
+
                         <a
                           href={link.originalUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-zinc-600 hover:text-zinc-950 flex items-center gap-1 text-xs truncate hover:underline"
+                          className="text-zinc-600 hover:text-zinc-950 flex items-center gap-1 text-xs truncate hover:underline max-w-[280px]"
                         >
                           <span className="truncate">{link.originalUrl}</span>
                           <ExternalLink className="w-3 h-3 text-zinc-400 shrink-0" />
@@ -303,6 +396,18 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                     {/* Actions Toolbar */}
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {/* Health Check Trigger */}
+                        <Button
+                          variant="ghost"
+                          size="iconSm"
+                          onClick={() => handleCheckHealth(link.shortCode)}
+                          disabled={checkingCode === link.shortCode}
+                          className="text-zinc-600 hover:text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                          title={t.btnHealthCheck}
+                        >
+                          <Activity className={`w-3.5 h-3.5 ${checkingCode === link.shortCode ? 'animate-spin text-emerald-600' : ''}`} />
+                        </Button>
+
                         {/* Security Preview Trigger */}
                         <Button
                           variant="ghost"

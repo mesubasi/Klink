@@ -64,13 +64,25 @@ public class UrlMapping implements Serializable {
     @Column(length = 255)
     private String webhookSecret;
 
+    @Column(length = 30)
+    private String healthStatus = "UNKNOWN";
+
+    private Long lastHealthCheck;
+
+    private Integer healthStatusCode;
+
+    @Column(length = 500)
+    private String healthErrorMessage;
+
+    private Long healthResponseTimeMs;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private UserAccount user;
 
     public UrlMapping() {}
 
-    public UrlMapping(UUID id, String originalUrl, String shortCode, Long createdAt, Long expiresAt, String fallbackUrl, Long clickCount, boolean active, String passwordHash, String blockedCountries, String blockedIps, boolean previewEnabled, String iosUrl, String androidUrl, String desktopUrl, String webhookUrl, String webhookSecret, UserAccount user) {
+    public UrlMapping(UUID id, String originalUrl, String shortCode, Long createdAt, Long expiresAt, String fallbackUrl, Long clickCount, boolean active, String passwordHash, String blockedCountries, String blockedIps, boolean previewEnabled, String iosUrl, String androidUrl, String desktopUrl, String webhookUrl, String webhookSecret, String healthStatus, Long lastHealthCheck, Integer healthStatusCode, String healthErrorMessage, Long healthResponseTimeMs, UserAccount user) {
         this.id = id;
         this.originalUrl = originalUrl;
         this.shortCode = shortCode;
@@ -88,23 +100,32 @@ public class UrlMapping implements Serializable {
         this.desktopUrl = desktopUrl;
         this.webhookUrl = webhookUrl;
         this.webhookSecret = webhookSecret;
+        this.healthStatus = healthStatus != null ? healthStatus : "UNKNOWN";
+        this.lastHealthCheck = lastHealthCheck;
+        this.healthStatusCode = healthStatusCode;
+        this.healthErrorMessage = healthErrorMessage;
+        this.healthResponseTimeMs = healthResponseTimeMs;
         this.user = user;
     }
 
+    public UrlMapping(UUID id, String originalUrl, String shortCode, Long createdAt, Long expiresAt, String fallbackUrl, Long clickCount, boolean active, String passwordHash, String blockedCountries, String blockedIps, boolean previewEnabled, String iosUrl, String androidUrl, String desktopUrl, String webhookUrl, String webhookSecret, UserAccount user) {
+        this(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, webhookSecret, "UNKNOWN", null, null, null, null, user);
+    }
+
     public UrlMapping(UUID id, String originalUrl, String shortCode, Long createdAt, Long expiresAt, String fallbackUrl, Long clickCount, boolean active, String passwordHash, String blockedCountries, String blockedIps, boolean previewEnabled, String iosUrl, String androidUrl, String desktopUrl, UserAccount user) {
-        this(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, null, null, user);
+        this(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, null, null, "UNKNOWN", null, null, null, null, user);
     }
 
     public UrlMapping(UUID id, String originalUrl, String shortCode, Long createdAt, Long expiresAt, String fallbackUrl, Long clickCount, boolean active, String passwordHash, String blockedCountries, String blockedIps, boolean previewEnabled, UserAccount user) {
-        this(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, previewEnabled, null, null, null, null, null, user);
+        this(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, previewEnabled, null, null, null, null, null, "UNKNOWN", null, null, null, null, user);
     }
 
     public UrlMapping(UUID id, String originalUrl, String shortCode, Long createdAt, Long expiresAt, String fallbackUrl, Long clickCount, boolean active, String passwordHash, String blockedCountries, String blockedIps, UserAccount user) {
-        this(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, false, null, null, null, null, null, user);
+        this(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, false, null, null, null, null, null, "UNKNOWN", null, null, null, null, user);
     }
 
     public UrlMapping(UUID id, String originalUrl, String shortCode, Long createdAt, Long expiresAt, String fallbackUrl, Long clickCount, boolean active, String passwordHash, UserAccount user) {
-        this(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, null, null, false, null, null, null, null, null, user);
+        this(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, null, null, false, null, null, null, null, null, "UNKNOWN", null, null, null, null, user);
     }
 
     @PrePersist
@@ -114,6 +135,9 @@ public class UrlMapping implements Serializable {
         }
         if (clickCount == null) {
             clickCount = 0L;
+        }
+        if (healthStatus == null) {
+            healthStatus = "UNKNOWN";
         }
     }
 
@@ -139,6 +163,11 @@ public class UrlMapping implements Serializable {
         private String desktopUrl;
         private String webhookUrl;
         private String webhookSecret;
+        private String healthStatus = "UNKNOWN";
+        private Long lastHealthCheck;
+        private Integer healthStatusCode;
+        private String healthErrorMessage;
+        private Long healthResponseTimeMs;
         private UserAccount user;
 
         public Builder id(UUID id) { this.id = id; return this; }
@@ -158,10 +187,15 @@ public class UrlMapping implements Serializable {
         public Builder desktopUrl(String desktopUrl) { this.desktopUrl = desktopUrl; return this; }
         public Builder webhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; return this; }
         public Builder webhookSecret(String webhookSecret) { this.webhookSecret = webhookSecret; return this; }
+        public Builder healthStatus(String healthStatus) { this.healthStatus = healthStatus; return this; }
+        public Builder lastHealthCheck(Long lastHealthCheck) { this.lastHealthCheck = lastHealthCheck; return this; }
+        public Builder healthStatusCode(Integer healthStatusCode) { this.healthStatusCode = healthStatusCode; return this; }
+        public Builder healthErrorMessage(String healthErrorMessage) { this.healthErrorMessage = healthErrorMessage; return this; }
+        public Builder healthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; return this; }
         public Builder user(UserAccount user) { this.user = user; return this; }
 
         public UrlMapping build() {
-            return new UrlMapping(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, webhookSecret, user);
+            return new UrlMapping(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, webhookSecret, healthStatus, lastHealthCheck, healthStatusCode, healthErrorMessage, healthResponseTimeMs, user);
         }
     }
 
@@ -203,6 +237,16 @@ public class UrlMapping implements Serializable {
     public void setWebhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; }
     public String getWebhookSecret() { return webhookSecret; }
     public void setWebhookSecret(String webhookSecret) { this.webhookSecret = webhookSecret; }
+    public String getHealthStatus() { return healthStatus; }
+    public void setHealthStatus(String healthStatus) { this.healthStatus = healthStatus; }
+    public Long getLastHealthCheck() { return lastHealthCheck; }
+    public void setLastHealthCheck(Long lastHealthCheck) { this.lastHealthCheck = lastHealthCheck; }
+    public Integer getHealthStatusCode() { return healthStatusCode; }
+    public void setHealthStatusCode(Integer healthStatusCode) { this.healthStatusCode = healthStatusCode; }
+    public String getHealthErrorMessage() { return healthErrorMessage; }
+    public void setHealthErrorMessage(String healthErrorMessage) { this.healthErrorMessage = healthErrorMessage; }
+    public Long getHealthResponseTimeMs() { return healthResponseTimeMs; }
+    public void setHealthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; }
     public UserAccount getUser() { return user; }
     public void setUser(UserAccount user) { this.user = user; }
 }
