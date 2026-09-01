@@ -133,6 +133,22 @@ public class UrlController {
         return ResponseEntity.ok(responses);
     }
 
+    @PostMapping("/api/v1/urls/{shortCode}/health-check")
+    @Operation(summary = "Tekli Link Sağlık Kontrolü (Link Health Check)", description = "Hedef web adresine HTTP isteği göndererek 200 OK, 404, 500, timeout veya SSL durumunu tespit eder.")
+    @ApiResponse(responseCode = "200", description = "Sağlık kontrolü tamamlandı ve güncel durum dönüldü")
+    public ResponseEntity<ShortenResponse> checkHealth(@PathVariable String shortCode) {
+        ShortenResponse response = urlShortenerService.checkHealth(shortCode);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/api/v1/urls/health-check-all")
+    @Operation(summary = "Tüm Linklerin Sağlık Kontrolü", description = "Kullanıcının tüm aktif linkleri için toplu sağlık taraması gerçekleştirir.")
+    @ApiResponse(responseCode = "200", description = "Tüm linklerin sağlık taraması tamamlandı")
+    public ResponseEntity<List<ShortenResponse>> checkAllHealth() {
+        List<ShortenResponse> responses = urlShortenerService.checkAllMyUrlsHealth();
+        return ResponseEntity.ok(responses);
+    }
+
     @PatchMapping("/api/v1/urls/{shortCode}/status")
     @Operation(summary = "Link Durumunu Değiştir (Aktif/Pasif)", description = "Linkin aktiflik durumunu günceller ve pasife alındığında Redis önbelleğini temizler.")
     public ResponseEntity<ShortenResponse> toggleUrlStatus(@PathVariable String shortCode, @RequestParam boolean active) {
@@ -141,12 +157,47 @@ public class UrlController {
     }
 
     @GetMapping("/api/v1/urls/{shortCode}/qrcode")
-    @Operation(summary = "QR Kod Üret", description = "Kısa link için PNG formatında dinamik QR Kod resmi üretir.")
-    public ResponseEntity<byte[]> getQrCode(
+    @Operation(summary = "Dinamik QR Kod Üret (PNG / SVG)", description = "Kısa link için renk, desen, köşe çerçevesi ve format parametreleriyle özelleştirilmiş QR Kod üretir.")
+    public ResponseEntity<?> getQrCode(
             @PathVariable String shortCode,
-            @RequestParam(defaultValue = "300") int width,
-            @RequestParam(defaultValue = "300") int height) {
-        byte[] qrImage = urlShortenerService.generateQrCodeForUrl(shortCode, width, height);
+            @RequestParam(defaultValue = "512") int width,
+            @RequestParam(defaultValue = "512") int height,
+            @RequestParam(defaultValue = "#000000") String fgColor,
+            @RequestParam(defaultValue = "#ffffff") String bgColor,
+            @RequestParam(required = false) String eyeColor,
+            @RequestParam(defaultValue = "square") String dotStyle,
+            @RequestParam(required = false) String logoBase64,
+            @RequestParam(defaultValue = "png") String format) {
+
+        if ("svg".equalsIgnoreCase(format)) {
+            String svg = urlShortenerService.generateQrCodeSvg(shortCode, width, fgColor, bgColor, eyeColor, dotStyle);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.valueOf("image/svg+xml;charset=UTF-8"))
+                    .body(svg);
+        }
+
+        byte[] qrImage = urlShortenerService.generateQrCodeImage(
+                shortCode, width, height, fgColor, bgColor, eyeColor, dotStyle, logoBase64);
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(qrImage);
+    }
+
+    @PostMapping("/api/v1/urls/qrcode/custom")
+    @Operation(summary = "Özel İçerik İçin Dinamik QR Kod Üret", description = "Herhangi bir metin veya URL için özelleştirilmiş PNG/SVG QR Kod üretir.")
+    public ResponseEntity<?> generateCustomQrCode(@RequestBody com.urlshortener.dto.CustomQrRequest request) {
+        String content = request.getContent() != null ? request.getContent() : "https://klink.to";
+
+        if ("svg".equalsIgnoreCase(request.getFormat())) {
+            String svg = urlShortenerService.generateCustomQrCodeSvg(
+                    content, request.getWidth(), request.getFgColor(), request.getBgColor(), request.getEyeColor(), request.getDotStyle());
+            return ResponseEntity.ok()
+                    .contentType(MediaType.valueOf("image/svg+xml;charset=UTF-8"))
+                    .body(svg);
+        }
+
+        byte[] qrImage = urlShortenerService.generateCustomQrCodePng(
+                content, request.getWidth(), request.getHeight(), request.getFgColor(), request.getBgColor(), request.getEyeColor(), request.getDotStyle(), request.getLogoBase64());
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
                 .body(qrImage);

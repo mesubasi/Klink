@@ -48,6 +48,8 @@ public class UrlShortenerService {
     private final ReportExportService reportExportService;
     private final UrlSecurityScannerService urlSecurityScannerService;
     private final BotDetectorService botDetectorService;
+    private final LinkHealthMonitorService linkHealthMonitorService;
+    private final DynamicQrCodeService dynamicQrCodeService;
 
     @Value("${app.domain:http://localhost:8080}")
     private String domain;
@@ -64,7 +66,9 @@ public class UrlShortenerService {
                                GeoIpService geoIpService,
                                ReportExportService reportExportService,
                                UrlSecurityScannerService urlSecurityScannerService,
-                               BotDetectorService botDetectorService) {
+                               BotDetectorService botDetectorService,
+                               LinkHealthMonitorService linkHealthMonitorService,
+                               DynamicQrCodeService dynamicQrCodeService) {
         this.urlMappingRepository = urlMappingRepository;
         this.clickAnalyticsRepository = clickAnalyticsRepository;
         this.userRepository = userRepository;
@@ -76,6 +80,8 @@ public class UrlShortenerService {
         this.reportExportService = reportExportService;
         this.urlSecurityScannerService = urlSecurityScannerService;
         this.botDetectorService = botDetectorService;
+        this.linkHealthMonitorService = linkHealthMonitorService;
+        this.dynamicQrCodeService = dynamicQrCodeService;
     }
 
     @Transactional
@@ -419,6 +425,27 @@ public class UrlShortenerService {
                 .collect(Collectors.toList());
     }
 
+    public ShortenResponse checkHealth(String shortCode) {
+        UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
+                .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
+
+        checkOwnershipOrAdmin(mapping);
+        UrlMapping updated = linkHealthMonitorService.checkUrlHealth(mapping);
+        return buildShortenResponse(updated);
+    }
+
+    public List<ShortenResponse> checkAllMyUrlsHealth() {
+        UserAccount user = getCurrentAuthenticatedUser();
+        if (user == null) {
+            throw new IllegalArgumentException(messageService.getMessage("user.not_found", "me"));
+        }
+
+        List<UrlMapping> updatedList = linkHealthMonitorService.checkUserUrlsHealth(user.getUsername());
+        return updatedList.stream()
+                .map(this::buildShortenResponse)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public ShortenResponse toggleUrlStatus(String shortCode, boolean active) {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
@@ -441,16 +468,7 @@ public class UrlShortenerService {
     }
 
     public byte[] generateQrCodeForUrl(String shortCode, int width, int height) {
-        UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
-                .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
-
-        String targetShortUrl = domain + "/" + mapping.getShortCode();
-        try {
-            return QrCodeGenerator.generateQrCodeImage(targetShortUrl, width, height);
-        } catch (Exception e) {
-            log.error("QR kodu oluşturulurken hata meydana geldi: {}", e.getMessage(), e);
-            throw new RuntimeException("QR kodu üretilemedi: " + e.getMessage());
-        }
+        return generateQrCodeImage(shortCode, width, height, "#000000", "#ffffff", null, "square", null);
     }
 
     @Transactional
@@ -640,6 +658,11 @@ public class UrlShortenerService {
                 .androidUrl(mapping.getAndroidUrl())
                 .desktopUrl(mapping.getDesktopUrl())
                 .webhookUrl(mapping.getWebhookUrl())
+                .healthStatus(mapping.getHealthStatus())
+                .lastHealthCheck(mapping.getLastHealthCheck())
+                .healthStatusCode(mapping.getHealthStatusCode())
+                .healthErrorMessage(mapping.getHealthErrorMessage())
+                .healthResponseTimeMs(mapping.getHealthResponseTimeMs())
                 .build();
     }
 
@@ -726,6 +749,11 @@ public class UrlShortenerService {
                 .androidUrl(mapping.getAndroidUrl())
                 .desktopUrl(mapping.getDesktopUrl())
                 .webhookUrl(mapping.getWebhookUrl())
+                .healthStatus(mapping.getHealthStatus())
+                .lastHealthCheck(mapping.getLastHealthCheck())
+                .healthStatusCode(mapping.getHealthStatusCode())
+                .healthErrorMessage(mapping.getHealthErrorMessage())
+                .healthResponseTimeMs(mapping.getHealthResponseTimeMs())
                 .build();
     }
 
@@ -816,5 +844,55 @@ public class UrlShortenerService {
             return xForwardedFor.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    public byte[] generateQrCodeImage(
+            String shortCode,
+            int width,
+            int height,
+            String fgColor,
+            String bgColor,
+            String eyeColor,
+            String dotStyle,
+            String logoBase64) {
+        String fullUrl = domain + "/" + shortCode;
+        return dynamicQrCodeService.generateCustomQrCodePng(
+                fullUrl, width, height, fgColor, bgColor, eyeColor, dotStyle, logoBase64);
+    }
+
+    public String generateQrCodeSvg(
+            String shortCode,
+            int size,
+            String fgColor,
+            String bgColor,
+            String eyeColor,
+            String dotStyle) {
+        String fullUrl = domain + "/" + shortCode;
+        return dynamicQrCodeService.generateCustomQrCodeSvg(
+                fullUrl, size, fgColor, bgColor, eyeColor, dotStyle);
+    }
+
+    public byte[] generateCustomQrCodePng(
+            String content,
+            int width,
+            int height,
+            String fgColor,
+            String bgColor,
+            String eyeColor,
+            String dotStyle,
+            String logoBase64) {
+        return dynamicQrCodeService.generateCustomQrCodePng(
+                content, width, height, fgColor, bgColor, eyeColor, dotStyle, logoBase64);
+    }
+
+    public String generateCustomQrCodeSvg(
+            String content,
+            int size,
+            String fgColor,
+            String bgColor,
+            String eyeColor,
+            String dotStyle) {
+        return dynamicQrCodeService.generateCustomQrCodeSvg(
+                content, size, fgColor, bgColor, eyeColor, dotStyle);
     }
 }

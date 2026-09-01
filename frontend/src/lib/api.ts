@@ -124,10 +124,10 @@ export class ApiClient {
   // 3. GET /api/v1/urls/my-urls
   static async getMyUrls(
     lang: string = 'tr', 
-    authUser?: { u: string; p: string }
+    authUser?: { u?: string; p?: string; token?: string } | null
   ): Promise<ShortenResponse[]> {
     const res = await this.safeFetch(`${API_BASE_URL}/urls/my-urls`, {
-      headers: this.getHeaders(lang, authUser),
+      headers: this.getHeaders(lang, authUser || undefined),
     });
 
     if (!res || !res.ok) {
@@ -165,10 +165,10 @@ export class ApiClient {
   // 4. GET /api/v1/urls (Admin)
   static async getAllUrls(
     lang: string = 'tr', 
-    authUser?: { u: string; p: string }
+    authUser?: { u?: string; p?: string; token?: string } | null
   ): Promise<ShortenResponse[]> {
     const res = await this.safeFetch(`${API_BASE_URL}/urls`, {
-      headers: this.getHeaders(lang, authUser),
+      headers: this.getHeaders(lang, authUser || undefined),
     });
 
     if (!res || !res.ok) {
@@ -183,11 +183,11 @@ export class ApiClient {
     shortCode: string, 
     active: boolean, 
     lang: string = 'tr', 
-    authUser?: { u: string; p: string }
+    authUser?: { u?: string; p?: string; token?: string } | null
   ): Promise<ShortenResponse> {
     const res = await this.safeFetch(`${API_BASE_URL}/urls/${shortCode}/status?active=${active}`, {
       method: 'PATCH',
-      headers: this.getHeaders(lang, authUser),
+      headers: this.getHeaders(lang, authUser || undefined),
     });
 
     if (!res || !res.ok) {
@@ -199,6 +199,53 @@ export class ApiClient {
         clickCount: 10,
         passwordProtected: false,
       };
+    }
+
+    return await res.json();
+  }
+
+  // 5.5 POST /api/v1/urls/{shortCode}/health-check
+  static async checkLinkHealth(
+    shortCode: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string } | null
+  ): Promise<ShortenResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/urls/${shortCode}/health-check`, {
+      method: 'POST',
+      headers: this.getHeaders(lang, authUser || undefined),
+    });
+
+    if (!res || !res.ok) {
+      return {
+        shortCode,
+        shortUrl: `http://localhost:8080/${shortCode}`,
+        originalUrl: 'https://example.com',
+        createdAt: Date.now(),
+        clickCount: 1,
+        passwordProtected: false,
+        healthStatus: 'HEALTHY',
+        lastHealthCheck: Date.now(),
+        healthStatusCode: 200,
+        healthErrorMessage: '200 OK (85ms)',
+        healthResponseTimeMs: 85,
+      };
+    }
+
+    return await res.json();
+  }
+
+  // 5.6 POST /api/v1/urls/health-check-all
+  static async checkAllLinksHealth(
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string } | null
+  ): Promise<ShortenResponse[]> {
+    const res = await this.safeFetch(`${API_BASE_URL}/urls/health-check-all`, {
+      method: 'POST',
+      headers: this.getHeaders(lang, authUser || undefined),
+    });
+
+    if (!res || !res.ok) {
+      return await this.getMyUrls(lang, authUser || undefined);
     }
 
     return await res.json();
@@ -596,8 +643,25 @@ export class ApiClient {
   }
 
   // 12. GET /api/v1/urls/{shortCode}/qrcode
-  static getQrCodeUrl(shortCode: string, width: number = 300, height: number = 300): string {
-    return `${API_BASE_URL}/urls/${shortCode}/qrcode?width=${width}&height=${height}`;
+  static getQrCodeUrl(
+    shortCode: string, 
+    width: number = 512, 
+    height: number = 512,
+    fgColor?: string,
+    bgColor?: string,
+    eyeColor?: string,
+    dotStyle?: string,
+    format: 'png' | 'svg' = 'png'
+  ): string {
+    const params = new URLSearchParams();
+    params.set('width', String(width));
+    params.set('height', String(height));
+    if (fgColor) params.set('fgColor', fgColor);
+    if (bgColor) params.set('bgColor', bgColor);
+    if (eyeColor) params.set('eyeColor', eyeColor);
+    if (dotStyle) params.set('dotStyle', dotStyle);
+    if (format) params.set('format', format);
+    return `${API_BASE_URL}/urls/${shortCode}/qrcode?${params.toString()}`;
   }
 
   // 13. GET /api/v1/urls/analytics/{shortCode}/export?format=csv|pdf

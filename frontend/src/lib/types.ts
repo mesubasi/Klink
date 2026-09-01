@@ -25,6 +25,11 @@ export interface ShortenResponse {
   androidUrl?: string;
   desktopUrl?: string;
   webhookUrl?: string;
+  healthStatus?: 'HEALTHY' | 'BROKEN' | 'DEGRADED' | 'UNKNOWN' | string;
+  lastHealthCheck?: number;
+  healthStatusCode?: number;
+  healthErrorMessage?: string;
+  healthResponseTimeMs?: number;
 }
 
 export interface UrlPreviewResponse {
@@ -48,6 +53,11 @@ export interface UrlPreviewResponse {
   androidUrl?: string;
   desktopUrl?: string;
   webhookUrl?: string;
+  healthStatus?: 'HEALTHY' | 'BROKEN' | 'DEGRADED' | 'UNKNOWN' | string;
+  lastHealthCheck?: number;
+  healthStatusCode?: number;
+  healthErrorMessage?: string;
+  healthResponseTimeMs?: number;
 }
 
 export interface BulkShortenRequest {
@@ -247,5 +257,17 @@ export interface ApiKeyApplyRequest {
 export interface ApiKeyActionRequest {
   rateLimitPerMinute?: number;
   rejectionReason?: string;
+}
+
+export interface CustomQrOptions {
+  content?: string;
+  width?: number;
+  height?: number;
+  fgColor?: string;
+  bgColor?: string;
+  eyeColor?: string;
+  dotStyle?: 'square' | 'dots' | 'rounded';
+  logoBase64?: string;
+  format?: 'png' | 'svg';
 }
 

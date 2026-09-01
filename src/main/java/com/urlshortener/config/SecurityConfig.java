@@ -57,7 +57,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/urls/*/preview", "/api/v1/urls/*/qrcode", "/api/v1/urls/analytics/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/bio/{username:[a-zA-Z0-9_-]+}").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/bio/{username:[a-zA-Z0-9_-]+}/view", "/api/v1/bio/link/*/click").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/v1/urls/shorten", "/api/v1/urls/bulk-shorten", "/api/v1/urls/*/proceed", "/api/v1/urls/*/verify-password").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/urls/shorten", "/api/v1/urls/bulk-shorten", "/api/v1/urls/*/proceed", "/api/v1/urls/*/verify-password", "/api/v1/urls/qrcode/**").permitAll()
                 // Kullanıcı Kaydı & Girişi (Register, Login, Logout, 2FA Login Verification)
                 .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/2fa/verify-login").permitAll()
                 // Swagger UI & OpenAPI Dokümanları
