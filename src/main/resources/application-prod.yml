@@ -1,0 +1,77 @@
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:klinkdb}?sslmode=prefer}
+    driver-class-name: ${DATABASE_DRIVER:org.postgresql.Driver}
+    username: ${DATABASE_USERNAME:klink_admin}
+    password: ${DATABASE_PASSWORD:klink_secret_password}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      connection-timeout: 20000
+
+  h2:
+    console:
+      enabled: false
+
+  jpa:
+    database-platform: ${JPA_DIALECT:org.hibernate.dialect.PostgreSQLDialect}
+    hibernate:
+      ddl-auto: ${HIBERNATE_DDL_AUTO:update}
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3000ms
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:klink_mq}
+    password: ${RABBITMQ_PASSWORD:klink_mq_pass}
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 5
+          initial-interval: 2000ms
+          multiplier: 2.0
+          max-interval: 10000ms
+
+app:
+  domain: ${APP_DOMAIN:https://klink.to}
+  frontend:
+    preview-url: ${FRONTEND_PREVIEW_URL:https://klink.to/preview/%s}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://klink.to,https://app.klink.to,http://localhost:3000}
+  ratelimit:
+    max-requests-per-minute: ${RATE_LIMIT_PER_MINUTE:120}
+  security:
+    scanner:
+      enabled: ${SECURITY_SCANNER_ENABLED:true}
+      google-safe-browsing-api-key: ${GOOGLE_SAFE_BROWSING_API_KEY:}
+      virustotal-api-key: ${VIRUSTOTAL_API_KEY:}

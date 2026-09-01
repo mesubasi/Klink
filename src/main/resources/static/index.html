@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwiftLink | Spring Boot High-Speed URL Shortener</title>
+    <meta name="description" content="Spring Boot, Redis Cache ve RabbitMQ ile güçlendirilmiş yüksek performanslı URL kısaltma ve yönetim paneli.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="background-globes">
+        <div class="globe globe-1"></div>
+        <div class="globe globe-2"></div>
+        <div class="globe globe-3"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="main-header">
+            <div class="logo-container">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-bolt-lightning"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>Swift<span>Link</span></h1>
+                    <span class="badge-env">Spring Boot 3 + Redis + RabbitMQ</span>
+                </div>
+            </div>
+            
+            <div class="status-pills">
+                <div class="status-pill redis-pill">
+                    <span class="dot pulse-green"></span>
+                    <i class="fa-solid fa-memory"></i> Redis Cache: <strong>Aktif</strong>
+                </div>
+                <div class="status-pill rabbit-pill">
+                    <span class="dot pulse-purple"></span>
+                    <i class="fa-solid fa-diagram-project"></i> RabbitMQ Queue: <strong>Aktif</strong>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Section & Shortener Card -->
+        <section class="hero-section">
+            <h2 class="hero-title">Uzun Linklerinizi Yıldırım Hızında Kısaltın</h2>
+            <p class="hero-subtitle">Redis önbellekleme ile <1ms yönlendirme süresi, RabbitMQ mesaj kuyruğu ile sıfır kayıplı trafik analitiği.</p>
+
+            <div class="shortener-card glass-panel">
+                <form id="shortenForm" onsubmit="handleShorten(event)">
+                    <div class="input-group main-input">
+                        <i class="fa-solid fa-link input-icon"></i>
+                        <input type="url" id="originalUrl" placeholder="Kısaltmak istediğiniz uzun URL'yi buraya yapıştırın..." required autocomplete="off">
+                        <button type="submit" id="shortenBtn" class="btn-primary">
+                            <span>Link Kısalt</span>
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </button>
+                    </div>
+
+                    <div class="advanced-options">
+                        <div class="input-group sub-input">
+                            <i class="fa-solid fa-signature input-icon"></i>
+                            <input type="text" id="customAlias" placeholder="Özel Kısa Kod (Opsiyonel, örn: kampanya2026)" pattern="[a-zA-Z0-9_-]+" title="Sadece harf, rakam, tire ve alt çizgi">
+                        </div>
+
+                        <div class="input-group sub-input">
+                            <i class="fa-solid fa-clock input-icon"></i>
+                            <select id="expirationDays">
+                                <option value="">Süresiz (Sürekli Geçerli)</option>
+                                <option value="1">1 Gün</option>
+                                <option value="7">7 Gün</option>
+                                <option value="30">30 Gün</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Result Box (Hidden by default) -->
+                <div id="resultCard" class="result-card hidden">
+                    <div class="result-header">
+                        <i class="fa-solid fa-circle-check success-icon"></i>
+                        <span>Kısa Linkiniz Başarıyla Oluşturuldu!</span>
+                    </div>
+                    <div class="result-body">
+                        <div class="short-url-box">
+                            <input type="text" id="resultShortUrl" readonly>
+                            <button onclick="copyToClipboard('resultShortUrl')" class="btn-copy" title="Kopyala">
+                                <i class="fa-regular fa-copy"></i> Kopyala
+                            </button>
+                            <a id="resultOpenBtn" href="#" target="_blank" class="btn-open" title="Yeni Sekmede Aç">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Overview Bar -->
+        <section class="stats-overview">
+            <div class="stat-card glass-panel">
+                <div class="stat-icon icon-blue"><i class="fa-solid fa-link"></i></div>
+                <div class="stat-info">
+                    <span class="stat-label">Toplam Link</span>
+                    <h3 id="statTotalLinks">0</h3>
+                </div>
+            </div>
+            <div class="stat-card glass-panel">
+                <div class="stat-icon icon-green"><i class="fa-solid fa-chart-line"></i></div>
+                <div class="stat-info">
+                    <span class="stat-label">Toplam Tıklama</span>
+                    <h3 id="statTotalClicks">0</h3>
+                </div>
+            </div>
+            <div class="stat-card glass-panel">
+                <div class="stat-icon icon-purple"><i class="fa-solid fa-microchip"></i></div>
+                <div class="stat-info">
+                    <span class="stat-label">Ortalama Yanıt Süresi</span>
+                    <h3>< 2 ms</h3>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard / Link Management Section -->
+        <section class="dashboard-section">
+            <div class="section-header">
+                <div>
+                    <h2><i class="fa-solid fa-list-check"></i> Link Yönetim Paneli</h2>
+                    <p>Oluşturduğunuz kısa linkleri yönetin ve anlık analitiklerini görüntüleyin.</p>
+                </div>
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="searchFilter" placeholder="Linklerde ara..." oninput="filterUrls()">
+                </div>
+            </div>
+
+            <div class="table-container glass-panel">
+                <table class="url-table">
+                    <thead>
+                        <tr>
+                            <th>Kısa Link</th>
+                            <th>Orijinal URL</th>
+                            <th>Tıklama</th>
+                            <th>Oluşturulma</th>
+                            <th>Durum</th>
+                            <th class="text-right">İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody id="urlTableBody">
+                        <tr>
+                            <td colspan="6" class="loading-state">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Linkler yükleniyor...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Analytics Detail Modal -->
+        <div id="analyticsModal" class="modal-overlay hidden">
+            <div class="modal-content glass-panel">
+                <div class="modal-header">
+                    <h3><i class="fa-solid fa-chart-pie"></i> Link Analitiği & Trafik Geçmişi</h3>
+                    <button onclick="closeModal()" class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="modal-stats-summary">
+                        <div class="m-stat">
+                            <span>Kısa Kod:</span>
+                            <strong id="modalShortCode">-</strong>
+                        </div>
+                        <div class="m-stat">
+                            <span>Toplam Tıklama:</span>
+                            <strong id="modalTotalClicks" class="text-highlight">0</strong>
+                        </div>
+                    </div>
+
+                    <div class="m-url-info">
+                        <span>Orijinal Hedef:</span>
+                        <a id="modalOriginalUrl" href="#" target="_blank" class="truncate-link">-</a>
+                    </div>
+
+                    <h4><i class="fa-solid fa-clock-rotate-left"></i> Son 50 Tıklama Akışı (RabbitMQ Asenkron Kayıt)</h4>
+                    <div class="modal-table-wrapper">
+                        <table class="analytics-table">
+                            <thead>
+                                tr>
+                                    <th>Zaman</th>
+                                    <th>IP Adresi</th>
+                                    <th>Tarayıcı / User Agent</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analyticsTableBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="main-footer">
+            <p>&copy; 2026 SwiftLink | Built with Spring Boot 3, Redis & RabbitMQ</p>
+        </footer>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- JS App -->
+    <script src="js/app.js"></script>
+</body>
+</html>
