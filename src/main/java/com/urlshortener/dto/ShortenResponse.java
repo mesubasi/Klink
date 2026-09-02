@@ -20,6 +20,8 @@ public class ShortenResponse {
     private Integer healthStatusCode;
     private String healthErrorMessage;
     private Long healthResponseTimeMs;
+    private String workspaceId;
+    private String workspaceName;
 
     public ShortenResponse() {}
 
@@ -87,6 +89,8 @@ public class ShortenResponse {
         private Integer healthStatusCode;
         private String healthErrorMessage;
         private Long healthResponseTimeMs;
+        private String workspaceId;
+        private String workspaceName;
 
         public Builder shortCode(String shortCode) { this.shortCode = shortCode; return this; }
         public Builder shortUrl(String shortUrl) { this.shortUrl = shortUrl; return this; }
@@ -107,9 +111,14 @@ public class ShortenResponse {
         public Builder healthStatusCode(Integer healthStatusCode) { this.healthStatusCode = healthStatusCode; return this; }
         public Builder healthErrorMessage(String healthErrorMessage) { this.healthErrorMessage = healthErrorMessage; return this; }
         public Builder healthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; return this; }
+        public Builder workspaceId(String workspaceId) { this.workspaceId = workspaceId; return this; }
+        public Builder workspaceName(String workspaceName) { this.workspaceName = workspaceName; return this; }
 
         public ShortenResponse build() {
-            return new ShortenResponse(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, healthStatus, lastHealthCheck, healthStatusCode, healthErrorMessage, healthResponseTimeMs);
+            ShortenResponse resp = new ShortenResponse(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, healthStatus, lastHealthCheck, healthStatusCode, healthErrorMessage, healthResponseTimeMs);
+            resp.setWorkspaceId(workspaceId);
+            resp.setWorkspaceName(workspaceName);
+            return resp;
         }
     }
 
@@ -151,4 +160,8 @@ public class ShortenResponse {
     public void setHealthErrorMessage(String healthErrorMessage) { this.healthErrorMessage = healthErrorMessage; }
     public Long getHealthResponseTimeMs() { return healthResponseTimeMs; }
     public void setHealthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; }
+    public String getWorkspaceId() { return workspaceId; }
+    public void setWorkspaceId(String workspaceId) { this.workspaceId = workspaceId; }
+    public String getWorkspaceName() { return workspaceName; }
+    public void setWorkspaceName(String workspaceName) { this.workspaceName = workspaceName; }
 }

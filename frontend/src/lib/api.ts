@@ -22,7 +22,12 @@ import {
   ApiKeyResponse,
   ApiKeyApplyRequest,
   ApiKeyActionRequest,
-  ApiKeyStatus
+  ApiKeyStatus,
+  CreateWorkspaceRequest,
+  WorkspaceResponse,
+  AddWorkspaceMemberRequest,
+  WorkspaceMemberResponse,
+  UpdateMemberRoleRequest
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
@@ -1100,6 +1105,141 @@ export class ApiClient {
         totalCalls: 0,
         createdAt: Date.now(),
       };
+    }
+
+    return await res.json();
+  }
+
+  // 28. POST /api/v1/workspaces
+  static async createWorkspace(
+    request: CreateWorkspaceRequest,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<WorkspaceResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces`, {
+      method: 'POST',
+      headers: this.getHeaders(lang, authUser),
+      body: JSON.stringify(request),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Çalışma alanı oluşturulamadı.');
+    }
+
+    return await res.json();
+  }
+
+  // 29. GET /api/v1/workspaces
+  static async getUserWorkspaces(
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<WorkspaceResponse[]> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces`, {
+      method: 'GET',
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      return [];
+    }
+
+    return await res.json();
+  }
+
+  // 30. GET /api/v1/workspaces/{workspaceId}
+  static async getWorkspaceDetails(
+    workspaceId: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<WorkspaceResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces/${workspaceId}`, {
+      method: 'GET',
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Çalışma alanı detayları alınamadı.');
+    }
+
+    return await res.json();
+  }
+
+  // 31. POST /api/v1/workspaces/{workspaceId}/members
+  static async addWorkspaceMember(
+    workspaceId: string,
+    request: AddWorkspaceMemberRequest,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<WorkspaceMemberResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces/${workspaceId}/members`, {
+      method: 'POST',
+      headers: this.getHeaders(lang, authUser),
+      body: JSON.stringify(request),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Üye eklenemedi.');
+    }
+
+    return await res.json();
+  }
+
+  // 32. PATCH /api/v1/workspaces/{workspaceId}/members/{userId}
+  static async updateWorkspaceMemberRole(
+    workspaceId: string,
+    userId: string,
+    request: UpdateMemberRoleRequest,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<WorkspaceMemberResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces/${workspaceId}/members/${userId}`, {
+      method: 'PATCH',
+      headers: this.getHeaders(lang, authUser),
+      body: JSON.stringify(request),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Üye rolü güncellenemedi.');
+    }
+
+    return await res.json();
+  }
+
+  // 33. DELETE /api/v1/workspaces/{workspaceId}/members/{userId}
+  static async removeWorkspaceMember(
+    workspaceId: string,
+    userId: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<void> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces/${workspaceId}/members/${userId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Üye çalışma alanından çıkarılamadı.');
+    }
+  }
+
+  // 34. GET /api/v1/workspaces/{workspaceId}/urls
+  static async getWorkspaceUrls(
+    workspaceId: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<ShortenResponse[]> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces/${workspaceId}/urls`, {
+      method: 'GET',
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      return [];
     }
 
     return await res.json();

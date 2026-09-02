@@ -7,9 +7,14 @@ import com.urlshortener.messaging.ClickEventPublisher;
 import com.urlshortener.model.ClickAnalytics;
 import com.urlshortener.model.UrlMapping;
 import com.urlshortener.model.UserAccount;
+import com.urlshortener.model.Workspace;
+import com.urlshortener.model.WorkspaceMember;
+import com.urlshortener.model.WorkspaceRole;
 import com.urlshortener.repository.ClickAnalyticsRepository;
 import com.urlshortener.repository.UrlMappingRepository;
 import com.urlshortener.repository.UserRepository;
+import com.urlshortener.repository.WorkspaceMemberRepository;
+import com.urlshortener.repository.WorkspaceRepository;
 import com.urlshortener.util.Base62Encoder;
 import com.urlshortener.util.QrCodeGenerator;
 import jakarta.servlet.http.HttpServletRequest;
@@ -50,6 +55,8 @@ public class UrlShortenerService {
     private final BotDetectorService botDetectorService;
     private final LinkHealthMonitorService linkHealthMonitorService;
     private final DynamicQrCodeService dynamicQrCodeService;
+    private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceMemberRepository workspaceMemberRepository;
 
     @Value("${app.domain:http://localhost:8080}")
     private String domain;
@@ -68,7 +75,9 @@ public class UrlShortenerService {
                                UrlSecurityScannerService urlSecurityScannerService,
                                BotDetectorService botDetectorService,
                                LinkHealthMonitorService linkHealthMonitorService,
-                               DynamicQrCodeService dynamicQrCodeService) {
+                               DynamicQrCodeService dynamicQrCodeService,
+                               WorkspaceRepository workspaceRepository,
+                               WorkspaceMemberRepository workspaceMemberRepository) {
         this.urlMappingRepository = urlMappingRepository;
         this.clickAnalyticsRepository = clickAnalyticsRepository;
         this.userRepository = userRepository;
@@ -82,6 +91,8 @@ public class UrlShortenerService {
         this.botDetectorService = botDetectorService;
         this.linkHealthMonitorService = linkHealthMonitorService;
         this.dynamicQrCodeService = dynamicQrCodeService;
+        this.workspaceRepository = workspaceRepository;
+        this.workspaceMemberRepository = workspaceMemberRepository;
     }
 
     @Transactional
@@ -134,6 +145,35 @@ public class UrlShortenerService {
 
         UserAccount currentUser = getCurrentAuthenticatedUser();
 
+        Workspace workspace = null;
+        if (request.getWorkspaceId() != null && !request.getWorkspaceId().trim().isEmpty()) {
+            if (currentUser == null) {
+                throw new IllegalArgumentException("Çalışma alanında link oluşturmak için oturum açmalısınız.");
+            }
+            try {
+                UUID wsId = UUID.fromString(request.getWorkspaceId().trim());
+                workspace = workspaceRepository.findById(wsId)
+                        .orElseThrow(() -> new IllegalArgumentException("Belirtilen çalışma alanı bulunamadı."));
+
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                boolean isSysAdmin = auth != null && auth.getAuthorities().stream()
+                        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+                if (!isSysAdmin) {
+                    WorkspaceMember member = workspaceMemberRepository.findByWorkspaceIdAndUserUsername(wsId, currentUser.getUsername())
+                            .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
+                    if (member.getRole() == WorkspaceRole.VIEWER) {
+                        throw new SecurityException("Salt-okunur (VIEWER) rolündeki üyeler çalışma alanında yeni link oluşturamaz.");
+                    }
+                }
+            } catch (IllegalArgumentException e) {
+                if (e.getMessage() != null && e.getMessage().contains("UUID")) {
+                    throw new IllegalArgumentException("Geçersiz çalışma alanı kimliği.");
+                }
+                throw e;
+            }
+        }
+
         UrlMapping mapping = UrlMapping.builder()
                 .originalUrl(originalUrl)
                 .shortCode(shortCode)
@@ -152,6 +192,7 @@ public class UrlShortenerService {
                 .webhookUrl(webhookUrl)
                 .webhookSecret(webhookSecret)
                 .user(currentUser)
+                .workspace(workspace)
                 .build();
 
         urlMappingRepository.save(mapping);
@@ -564,14 +605,24 @@ public class UrlShortenerService {
             return;
         }
 
-        boolean isAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (isAdmin) {
+        boolean isSystemAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isSystemAdmin) {
             return;
         }
 
-        if (mapping.getUser() != null && !mapping.getUser().getUsername().equals(auth.getName())) {
-            throw new IllegalArgumentException(messageService.getMessage("user.no_permission"));
+        if (mapping.getUser() != null && mapping.getUser().getUsername().equals(auth.getName())) {
+            return;
         }
+
+        if (mapping.getWorkspace() != null) {
+            Optional<WorkspaceMember> memberOpt = workspaceMemberRepository.findByWorkspaceIdAndUserUsername(
+                    mapping.getWorkspace().getId(), auth.getName());
+            if (memberOpt.isPresent() && memberOpt.get().getRole() == WorkspaceRole.ADMIN) {
+                return;
+            }
+        }
+
+        throw new IllegalArgumentException(messageService.getMessage("user.no_permission"));
     }
 
     private void publishClickEvent(String shortCode, HttpServletRequest request) {
@@ -761,7 +812,7 @@ public class UrlShortenerService {
     }
 
     private ShortenResponse buildShortenResponse(UrlMapping mapping) {
-        return ShortenResponse.builder()
+        ShortenResponse.Builder builder = ShortenResponse.builder()
                 .shortCode(mapping.getShortCode())
                 .shortUrl(domain + "/" + mapping.getShortCode())
                 .originalUrl(mapping.getOriginalUrl())
@@ -780,8 +831,14 @@ public class UrlShortenerService {
                 .lastHealthCheck(mapping.getLastHealthCheck())
                 .healthStatusCode(mapping.getHealthStatusCode())
                 .healthErrorMessage(mapping.getHealthErrorMessage())
-                .healthResponseTimeMs(mapping.getHealthResponseTimeMs())
-                .build();
+                .healthResponseTimeMs(mapping.getHealthResponseTimeMs());
+
+        if (mapping.getWorkspace() != null) {
+            builder.workspaceId(mapping.getWorkspace().getId().toString())
+                   .workspaceName(mapping.getWorkspace().getName());
+        }
+
+        return builder.build();
     }
 
     private String checkAccessRestrictions(UrlMapping mapping, HttpServletRequest request) {

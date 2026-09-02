@@ -20,6 +20,10 @@ public interface UrlMappingRepository extends JpaRepository<UrlMapping, UUID> {
 
     List<UrlMapping> findByUserUsername(String username);
 
+    List<UrlMapping> findByWorkspaceId(UUID workspaceId);
+
+    long countByWorkspaceId(UUID workspaceId);
+
     List<UrlMapping> findByActiveTrue();
 
     List<UrlMapping> findByHealthStatus(String healthStatus);

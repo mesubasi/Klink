@@ -10,6 +10,7 @@ export interface ShortenRequest {
   desktopUrl?: string;
   webhookUrl?: string;
   webhookSecret?: string;
+  workspaceId?: string;
 }
 
 export interface ShortenResponse {
@@ -30,6 +31,8 @@ export interface ShortenResponse {
   healthStatusCode?: number;
   healthErrorMessage?: string;
   healthResponseTimeMs?: number;
+  workspaceId?: string;
+  workspaceName?: string;
 }
 
 export interface UrlPreviewResponse {
@@ -270,4 +273,42 @@ export interface CustomQrOptions {
   logoBase64?: string;
   format?: 'png' | 'svg';
 }
+
+export type WorkspaceRole = 'ADMIN' | 'MEMBER' | 'VIEWER';
+
+export interface WorkspaceMemberResponse {
+  userId: string;
+  username: string;
+  email: string;
+  role: WorkspaceRole;
+  joinedAt: number;
+}
+
+export interface WorkspaceResponse {
+  id: string;
+  name: string;
+  description?: string;
+  slug: string;
+  ownerUsername: string;
+  currentUserRole: WorkspaceRole;
+  memberCount: number;
+  linkCount: number;
+  createdAt: number;
+  members?: WorkspaceMemberResponse[];
+}
+
+export interface CreateWorkspaceRequest {
+  name: string;
+  description?: string;
+}
+
+export interface AddWorkspaceMemberRequest {
+  email: string;
+  role: WorkspaceRole;
+}
+
+export interface UpdateMemberRoleRequest {
+  role: WorkspaceRole;
+}
+
 

@@ -72,9 +72,10 @@ public class SecurityConfig {
                 // Admin Özel Telemetri ve CRM Endpoint'leri (Yalnızca ROLE_ADMIN erişebilir)
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 
-                // Kullanıcı Yönetim Endpoint'leri (Bio Me ve API Keys Dahil)
+                // Kullanıcı Yönetim Endpoint'leri (Bio Me, API Keys ve Çalışma Alanları Dahil)
                 .requestMatchers("/api/v1/bio/me", "/api/v1/api-keys/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/v1/urls/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/v1/workspaces/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/v1/auth/me", "/api/v1/auth/2fa/**").hasAnyRole("USER", "ADMIN")
                 
                 .anyRequest().authenticated()

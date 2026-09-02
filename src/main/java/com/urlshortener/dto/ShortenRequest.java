@@ -40,6 +40,8 @@ public class ShortenRequest {
 
     private String webhookSecret;
 
+    private String workspaceId;
+
     public ShortenRequest() {}
 
     public ShortenRequest(String originalUrl, String customAlias, Integer expirationDays, String password) {
@@ -124,4 +126,6 @@ public class ShortenRequest {
     public void setWebhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; }
     public String getWebhookSecret() { return webhookSecret; }
     public void setWebhookSecret(String webhookSecret) { this.webhookSecret = webhookSecret; }
+    public String getWorkspaceId() { return workspaceId; }
+    public void setWorkspaceId(String workspaceId) { this.workspaceId = workspaceId; }
 }

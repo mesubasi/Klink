@@ -15,7 +15,8 @@ import {
   PlusCircle,
   ExternalLink,
   Sparkles,
-  KeyRound
+  KeyRound,
+  Building2
 } from 'lucide-react';
 import Link from 'next/link';
 import { Navbar } from '@/components/Navbar';
@@ -24,6 +25,7 @@ import { MyLinksTable } from '@/components/MyLinksTable';
 import { BulkShortenerWidget } from '@/components/BulkShortenerWidget';
 import { BioPageEditor } from '@/components/BioPageEditor';
 import { DeveloperApiWidget } from '@/components/DeveloperApiWidget';
+import { WorkspaceManagerWidget } from '@/components/WorkspaceManagerWidget';
 import { QrCodeModal } from '@/components/QrCodeModal';
 import { AnalyticsModal } from '@/components/AnalyticsModal';
 import { PasswordVerifyModal } from '@/components/PasswordVerifyModal';
@@ -38,7 +40,7 @@ import { Badge } from '@/components/ui/badge';
 
 export default function UserDashboardPage() {
   const [lang, setLang] = useState<Language>('tr');
-  const [activeTab, setActiveTab] = useState<'overview' | 'vault' | 'bulk' | 'bio' | 'api'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'vault' | 'bulk' | 'bio' | 'workspaces' | 'api'>('overview');
   const [authUser, setAuthUser] = useState<{ u: string; p: string; token?: string; role?: string } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -312,10 +314,10 @@ export default function UserDashboardPage() {
         {/* Segmented Navigation Tabs */}
         <Tabs
           value={activeTab}
-          onValueChange={(val) => setActiveTab(val as 'overview' | 'vault' | 'bulk' | 'bio' | 'api')}
+          onValueChange={(val) => setActiveTab(val as 'overview' | 'vault' | 'bulk' | 'bio' | 'workspaces' | 'api')}
           className="space-y-6"
         >
-          <TabsList className="grid w-full max-w-2xl grid-cols-5 bg-zinc-100 p-1 rounded-xl">
+          <TabsList className="grid w-full max-w-3xl grid-cols-3 sm:grid-cols-6 bg-zinc-100 p-1 rounded-xl">
             <TabsTrigger value="overview" className="flex items-center gap-1.5 text-xs font-semibold">
               <LayoutDashboard className="w-3.5 h-3.5" />
               <span>{t.tabOverview}</span>
@@ -331,6 +333,10 @@ export default function UserDashboardPage() {
             <TabsTrigger value="bio" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-purple-600 data-[state=active]:text-white">
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               <span>{lang === 'tr' ? '✨ Bio Sayfam' : '✨ Bio Page'}</span>
+            </TabsTrigger>
+            <TabsTrigger value="workspaces" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+              <Building2 className="w-3.5 h-3.5 text-blue-300" />
+              <span>{lang === 'tr' ? '🏢 Çalışma Alanı' : '🏢 Workspaces'}</span>
             </TabsTrigger>
             <TabsTrigger value="api" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-zinc-950 data-[state=active]:text-white">
               <KeyRound className="w-3.5 h-3.5 text-amber-400" />
@@ -391,7 +397,14 @@ export default function UserDashboardPage() {
             />
           </TabsContent>
 
-          {/* Tab 5: Developer API Key Management */}
+          {/* Tab 5: Workspace and Team Management */}
+          <TabsContent value="workspaces">
+            <WorkspaceManagerWidget
+              authUser={authUser}
+            />
+          </TabsContent>
+
+          {/* Tab 6: Developer API Key Management */}
           <TabsContent value="api">
             <DeveloperApiWidget
               lang={lang}
