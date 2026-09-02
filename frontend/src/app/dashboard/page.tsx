@@ -169,7 +169,7 @@ export default function UserDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-zinc-950 selection:bg-zinc-900 selection:text-white flex flex-col pb-20">
+    <div className="min-h-screen bg-[#fafafa] dark:bg-zinc-950 text-zinc-950 dark:text-zinc-100 selection:bg-zinc-900 selection:text-white flex flex-col pb-20 transition-colors duration-200">
       {/* Sleek Navbar */}
       <Navbar
         lang={lang}
@@ -182,16 +182,16 @@ export default function UserDashboardPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 space-y-6 w-full flex-1">
         {/* Top Breadcrumb & Action Toolbar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-zinc-500">
+          <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
             <Link
               href="/"
-              className="flex items-center gap-1.5 font-medium hover:text-zinc-950 transition-colors"
+              className="flex items-center gap-1.5 font-medium hover:text-zinc-950 dark:hover:text-white transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>{lang === 'tr' ? 'Ana Sayfa' : 'Home'}</span>
             </Link>
             <span>/</span>
-            <span className="font-bold text-zinc-950">{lang === 'tr' ? 'Link Yönetim Paneli' : 'Link Dashboard'}</span>
+            <span className="font-bold text-zinc-950 dark:text-white">{lang === 'tr' ? 'Link Yönetim Paneli' : 'Link Dashboard'}</span>
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
@@ -200,10 +200,10 @@ export default function UserDashboardPage() {
               size="sm"
               onClick={handleScanAllHealth}
               disabled={scanningAll || links.length === 0}
-              className="text-xs h-8 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 border-emerald-200 cursor-pointer"
+              className="text-xs h-8 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-800 dark:hover:text-emerald-300 border-emerald-200 dark:border-emerald-800 cursor-pointer"
               title="Tüm linklerin sağlık kontrolünü yap"
             >
-              <Activity className={`w-3.5 h-3.5 mr-1 ${scanningAll ? 'animate-spin' : 'text-emerald-600'}`} />
+              <Activity className={`w-3.5 h-3.5 mr-1 ${scanningAll ? 'animate-spin' : 'text-emerald-600 dark:text-emerald-400'}`} />
               <span>{scanningAll ? t.btnScanning : t.btnScanAll}</span>
             </Button>
 
@@ -211,17 +211,17 @@ export default function UserDashboardPage() {
               variant={is2FAEnabled ? "secondary" : "outline"}
               size="sm"
               onClick={() => setTwoFactorModalOpen(true)}
-              className="text-xs h-8"
+              className="text-xs h-8 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-200"
             >
               {is2FAEnabled ? (
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 mr-1" />
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-1" />
               ) : (
                 <Shield className="w-3.5 h-3.5 text-zinc-400 mr-1" />
               )}
               <span>{is2FAEnabled ? (lang === 'tr' ? '2FA Korumalı' : '2FA Active') : (lang === 'tr' ? '2FA Kur' : 'Enable 2FA')}</span>
             </Button>
 
-            <Button variant="outline" size="sm" asChild className="text-xs h-8">
+            <Button variant="outline" size="sm" asChild className="text-xs h-8 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-200">
               <Link href="/admin">
                 <span>{lang === 'tr' ? 'Admin CRM' : 'Admin CRM'}</span>
               </Link>
@@ -232,15 +232,15 @@ export default function UserDashboardPage() {
         {/* High-End Metric Cards Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Card 1: Total Links */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-zinc-200/90 shadow-2xs space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/90 dark:border-zinc-800 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-zinc-500">{t.cardTotalLinks}</p>
-              <div className="w-8 h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center">
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{t.cardTotalLinks}</p>
+              <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center">
                 <Link2 className="w-4 h-4" />
               </div>
             </div>
             <div>
-              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950">{links.length}</h4>
+              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950 dark:text-white">{links.length}</h4>
               <p className="text-[11px] text-zinc-400 font-medium mt-0.5">
                 {protectedCount} {lang === 'tr' ? 'şifre korumalı' : 'password protected'}
               </p>
@@ -248,16 +248,16 @@ export default function UserDashboardPage() {
           </div>
 
           {/* Card 2: Total Clicks */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-zinc-200/90 shadow-2xs space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/90 dark:border-zinc-800 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-zinc-500">{t.cardTotalClicks}</p>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center">
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{t.cardTotalClicks}</p>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/60 flex items-center justify-center">
                 <MousePointerClick className="w-4 h-4" />
               </div>
             </div>
             <div>
-              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950">{totalClicks}</h4>
-              <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-medium mt-0.5">
+              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950 dark:text-white">{totalClicks}</h4>
+              <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span>{lang === 'tr' ? 'Canlı Telemetri' : 'Real-time'}</span>
               </div>
@@ -265,18 +265,18 @@ export default function UserDashboardPage() {
           </div>
 
           {/* Card 3: Link Health Status */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-zinc-200/90 shadow-2xs space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/90 dark:border-zinc-800 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-zinc-500">{lang === 'tr' ? 'Link Sağlığı' : 'Link Health'}</p>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${brokenCount > 0 ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{lang === 'tr' ? 'Link Sağlığı' : 'Link Health'}</p>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${brokenCount > 0 ? 'bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/60' : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/60'}`}>
                 <Activity className="w-4 h-4" />
               </div>
             </div>
             <div>
-              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950">
+              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950 dark:text-white">
                 {brokenCount > 0 ? (
-                  <span className="text-red-600 flex items-center gap-1.5">
-                    {brokenCount} <span className="text-xs font-semibold uppercase text-red-600">{t.healthBroken}</span>
+                  <span className="text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                    {brokenCount} <span className="text-xs font-semibold uppercase text-red-600 dark:text-red-400">{t.healthBroken}</span>
                   </span>
                 ) : (
                   <span>{healthyCount > 0 ? `${healthyCount}/${links.length}` : (links.length > 0 ? links.length : 0)}</span>
@@ -293,15 +293,15 @@ export default function UserDashboardPage() {
           </div>
 
           {/* Card 4: Avg CTR */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-zinc-200/90 shadow-2xs space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/90 dark:border-zinc-800 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-zinc-500">{t.cardAvgCtr}</p>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center">
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{t.cardAvgCtr}</p>
+              <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-800/60 flex items-center justify-center">
                 <Activity className="w-4 h-4" />
               </div>
             </div>
             <div>
-              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950">
+              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950 dark:text-white">
                 {links.length > 0 ? (totalClicks / links.length).toFixed(1) : '0.0'}
               </h4>
               <p className="text-[11px] text-zinc-400 font-medium mt-0.5">
@@ -317,16 +317,16 @@ export default function UserDashboardPage() {
           onValueChange={(val) => setActiveTab(val as 'overview' | 'vault' | 'bulk' | 'bio' | 'workspaces' | 'api')}
           className="space-y-6"
         >
-          <TabsList className="grid w-full max-w-3xl grid-cols-3 sm:grid-cols-6 bg-zinc-100 p-1 rounded-xl">
-            <TabsTrigger value="overview" className="flex items-center gap-1.5 text-xs font-semibold">
+          <TabsList className="grid w-full max-w-3xl grid-cols-3 sm:grid-cols-6 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-800">
+            <TabsTrigger value="overview" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-white">
               <LayoutDashboard className="w-3.5 h-3.5" />
               <span>{t.tabOverview}</span>
             </TabsTrigger>
-            <TabsTrigger value="vault" className="flex items-center gap-1.5 text-xs font-semibold">
+            <TabsTrigger value="vault" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-white">
               <Link2 className="w-3.5 h-3.5" />
               <span>{t.tabMyLinks}</span>
             </TabsTrigger>
-            <TabsTrigger value="bulk" className="flex items-center gap-1.5 text-xs font-semibold">
+            <TabsTrigger value="bulk" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-white">
               <Layers className="w-3.5 h-3.5" />
               <span>{t.tabBulk}</span>
             </TabsTrigger>
@@ -338,7 +338,7 @@ export default function UserDashboardPage() {
               <Building2 className="w-3.5 h-3.5 text-blue-300" />
               <span>{lang === 'tr' ? '🏢 Çalışma Alanı' : '🏢 Workspaces'}</span>
             </TabsTrigger>
-            <TabsTrigger value="api" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-zinc-950 data-[state=active]:text-white">
+            <TabsTrigger value="api" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-zinc-950 dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-white">
               <KeyRound className="w-3.5 h-3.5 text-amber-400" />
               <span>{lang === 'tr' ? '🔑 API Keys' : '🔑 API Keys'}</span>
             </TabsTrigger>
