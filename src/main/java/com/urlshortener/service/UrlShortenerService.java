@@ -57,6 +57,7 @@ public class UrlShortenerService {
     private final DynamicQrCodeService dynamicQrCodeService;
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final WorkspacePermissionService workspacePermissionService;
 
     @Value("${app.domain:http://localhost:8080}")
     private String domain;
@@ -77,7 +78,8 @@ public class UrlShortenerService {
                                LinkHealthMonitorService linkHealthMonitorService,
                                DynamicQrCodeService dynamicQrCodeService,
                                WorkspaceRepository workspaceRepository,
-                               WorkspaceMemberRepository workspaceMemberRepository) {
+                               WorkspaceMemberRepository workspaceMemberRepository,
+                               WorkspacePermissionService workspacePermissionService) {
         this.urlMappingRepository = urlMappingRepository;
         this.clickAnalyticsRepository = clickAnalyticsRepository;
         this.userRepository = userRepository;
@@ -93,6 +95,7 @@ public class UrlShortenerService {
         this.dynamicQrCodeService = dynamicQrCodeService;
         this.workspaceRepository = workspaceRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
+        this.workspacePermissionService = workspacePermissionService;
     }
 
     @Transactional
@@ -160,10 +163,9 @@ public class UrlShortenerService {
                         .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
                 if (!isSysAdmin) {
-                    WorkspaceMember member = workspaceMemberRepository.findByWorkspaceIdAndUserUsername(wsId, currentUser.getUsername())
-                            .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
-                    if (member.getRole() == WorkspaceRole.VIEWER) {
-                        throw new SecurityException("Salt-okunur (VIEWER) rolündeki üyeler çalışma alanında yeni link oluşturamaz.");
+                    boolean hasCreatePerm = workspacePermissionService.hasPermission(wsId, currentUser.getUsername(), "canCreateLink");
+                    if (!hasCreatePerm) {
+                        throw new SecurityException("Bu çalışma alanında yeni link oluşturma (canCreateLink) yetkiniz bulunmamaktadır.");
                     }
                 }
             } catch (IllegalArgumentException e) {

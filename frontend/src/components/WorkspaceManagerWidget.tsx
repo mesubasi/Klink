@@ -17,9 +17,21 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  Layers
+  Layers,
+  Save,
+  Lock,
+  Zap,
+  Check,
+  X
 } from 'lucide-react';
-import { WorkspaceResponse, WorkspaceMemberResponse, WorkspaceRole, ShortenResponse } from '@/lib/types';
+import { 
+  WorkspaceResponse, 
+  WorkspaceMemberResponse, 
+  WorkspaceRole, 
+  ShortenResponse,
+  WorkspacePermissionMatrixResponse,
+  RolePermissionDto 
+} from '@/lib/types';
 import { ApiClient } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +49,9 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
   const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceUrls, setWorkspaceUrls] = useState<ShortenResponse[]>([]);
+  const [permissionMatrix, setPermissionMatrix] = useState<WorkspacePermissionMatrixResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savingMatrix, setSavingMatrix] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -49,7 +63,7 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>('MEMBER');
 
-  const [activeTab, setActiveTab] = useState<'members' | 'urls'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'urls' | 'matrix'>('members');
 
   useEffect(() => {
     if (authUser) {
@@ -83,11 +97,43 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
       if (onSelectWorkspaceForLinks) {
         onSelectWorkspaceForLinks(details);
       }
-      // Also fetch URLs
+      // Also fetch URLs and Permission Matrix
       const urls = await ApiClient.getWorkspaceUrls(wsId, 'tr', authUser);
       setWorkspaceUrls(urls);
+
+      const matrix = await ApiClient.getWorkspacePermissionMatrix(wsId, 'tr', authUser);
+      setPermissionMatrix(matrix);
     } catch (err: any) {
       setErrorMsg(err.message || 'Çalışma alanı detayları alınamadı.');
+    }
+  };
+
+  const handleToggleMatrixPerm = (role: 'member' | 'viewer', permKey: keyof RolePermissionDto) => {
+    if (!permissionMatrix || selectedWorkspace?.currentUserRole !== 'ADMIN') return;
+    setPermissionMatrix({
+      ...permissionMatrix,
+      [role]: {
+        ...permissionMatrix[role],
+        [permKey]: !permissionMatrix[role][permKey],
+      },
+    });
+  };
+
+  const handleSaveMatrix = async () => {
+    if (!authUser || !selectedWorkspace || !permissionMatrix) return;
+    setSavingMatrix(true);
+    setErrorMsg(null);
+    try {
+      const updated = await ApiClient.updateWorkspacePermissionMatrix(selectedWorkspace.id, {
+        member: permissionMatrix.member,
+        viewer: permissionMatrix.viewer,
+      }, 'tr', authUser);
+      setPermissionMatrix(updated);
+      setSuccessMsg('İzin matrisi başarıyla güncellendi ve Redis önbelleği anında yenilendi.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'İzin matrisi güncellenirken hata oluştu.');
+    } finally {
+      setSavingMatrix(false);
     }
   };
 
@@ -293,6 +339,16 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
             >
               <LinkIcon className="w-3.5 h-3.5" /> Çalışma Alanı Linkleri ({workspaceUrls.length})
             </button>
+            <button
+              onClick={() => setActiveTab('matrix')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeTab === 'matrix'
+                  ? 'bg-zinc-800 text-white border border-zinc-700'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-400" /> 🛡️ İzinler & Güvenlik Matrisi
+            </button>
           </div>
 
           {/* Tab 1: Members Table */}
@@ -430,6 +486,101 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
                         </TableCell>
                       </TableRow>
                     )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tab 3: Granular Permission Matrix */}
+          {activeTab === 'matrix' && permissionMatrix && (
+            <Card className="bg-zinc-900/60 border-zinc-800">
+              <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-amber-400" /> İnce Taneli Yetkilendirme & Güvenlik Matrisi (RBAC)
+                  </CardTitle>
+                  <CardDescription className="text-xs text-zinc-400">
+                    MEMBER ve VIEWER rollerine atanmış işlevsel izinleri özelleştirin.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[11px] gap-1 py-1">
+                    <Zap className="w-3 h-3 text-emerald-400" /> Redis Sub-1ms Cache
+                  </Badge>
+                  {isCurrentAdmin && (
+                    <Button
+                      onClick={handleSaveMatrix}
+                      disabled={savingMatrix}
+                      className="bg-blue-600 hover:bg-blue-500 text-white gap-1.5 text-xs h-8"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      {savingMatrix ? 'Kaydediliyor...' : 'İzinleri Kaydet'}
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-zinc-800 hover:bg-transparent">
+                      <TableHead className="text-zinc-400 text-xs w-2/5">İşlevsel İzin / Eylem</TableHead>
+                      <TableHead className="text-center text-zinc-400 text-xs">
+                        <div className="flex items-center justify-center gap-1">
+                          <Crown className="w-3.5 h-3.5 text-purple-400" /> ADMIN
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center text-zinc-400 text-xs">
+                        <div className="flex items-center justify-center gap-1">
+                          <UserCheck className="w-3.5 h-3.5 text-blue-400" /> MEMBER
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center text-zinc-400 text-xs">
+                        <div className="flex items-center justify-center gap-1">
+                          <Eye className="w-3.5 h-3.5 text-zinc-400" /> VIEWER
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[
+                      { key: 'canCreateLink', label: 'Yeni Kısa Link Oluşturma', desc: 'Çalışma alanı adına yeni bağlantılar ve alias üretebilir' },
+                      { key: 'canDeleteLink', label: 'Link Silme', desc: 'Çalışma alanındaki kısa bağlantıları kalıcı olarak silebilir' },
+                      { key: 'canExportReports', label: 'Rapor İndirme (CSV/PDF)', desc: 'Tıklama analitiği ve performans raporlarını dışa aktarabilir' },
+                      { key: 'canCustomizeQr', label: 'Dinamik QR Kod Tasarımı', desc: 'Özel renk, desen ve logolu QR kodlar üretebilir' },
+                      { key: 'canManageWebhooks', label: 'Webhook Entegrasyonu', desc: 'Tıklama ve güvenlik olayları için hedef webhook tanımlayabilir' },
+                      { key: 'canViewAnalytics', label: 'Analitik ve Telemetriyi İzleme', desc: 'Tıklama grafikleri ve coğrafi dağılımı inceleyebilir' },
+                    ].map((perm) => (
+                      <TableRow key={perm.key} className="border-zinc-800/60 hover:bg-zinc-800/30">
+                        <TableCell>
+                          <div className="text-xs font-medium text-white">{perm.label}</div>
+                          <div className="text-[11px] text-zinc-500">{perm.desc}</div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            <Lock className="w-2.5 h-2.5 mr-1" /> Her Zaman Açık
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <input
+                            type="checkbox"
+                            disabled={!isCurrentAdmin}
+                            checked={permissionMatrix.member[perm.key as keyof RolePermissionDto]}
+                            onChange={() => handleToggleMatrixPerm('member', perm.key as keyof RolePermissionDto)}
+                            className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-zinc-900 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <input
+                            type="checkbox"
+                            disabled={!isCurrentAdmin}
+                            checked={permissionMatrix.viewer[perm.key as keyof RolePermissionDto]}
+                            onChange={() => handleToggleMatrixPerm('viewer', perm.key as keyof RolePermissionDto)}
+                            className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-zinc-900 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>

@@ -311,4 +311,28 @@ export interface UpdateMemberRoleRequest {
   role: WorkspaceRole;
 }
 
+export interface RolePermissionDto {
+  canCreateLink: boolean;
+  canDeleteLink: boolean;
+  canExportReports: boolean;
+  canCustomizeQr: boolean;
+  canManageWebhooks: boolean;
+  canViewAnalytics: boolean;
+}
+
+export interface WorkspacePermissionMatrixResponse {
+  workspaceId: string;
+  workspaceName: string;
+  admin: RolePermissionDto;
+  member: RolePermissionDto;
+  viewer: RolePermissionDto;
+  updatedAt: number;
+}
+
+export interface UpdatePermissionMatrixRequest {
+  member: RolePermissionDto;
+  viewer: RolePermissionDto;
+}
+
+
 

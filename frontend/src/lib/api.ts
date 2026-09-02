@@ -27,7 +27,9 @@ import {
   WorkspaceResponse,
   AddWorkspaceMemberRequest,
   WorkspaceMemberResponse,
-  UpdateMemberRoleRequest
+  UpdateMemberRoleRequest,
+  WorkspacePermissionMatrixResponse,
+  UpdatePermissionMatrixRequest
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
@@ -1240,6 +1242,53 @@ export class ApiClient {
 
     if (!res || !res.ok) {
       return [];
+    }
+
+    return await res.json();
+  }
+
+  // 35. GET /api/v1/workspaces/{workspaceId}/permissions
+  static async getWorkspacePermissionMatrix(
+    workspaceId: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<WorkspacePermissionMatrixResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces/${workspaceId}/permissions`, {
+      method: 'GET',
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      // Fallback varsayılan matris
+      return {
+        workspaceId,
+        workspaceName: 'Çalışma Alanı',
+        admin: { canCreateLink: true, canDeleteLink: true, canExportReports: true, canCustomizeQr: true, canManageWebhooks: true, canViewAnalytics: true },
+        member: { canCreateLink: true, canDeleteLink: true, canExportReports: true, canCustomizeQr: true, canManageWebhooks: false, canViewAnalytics: true },
+        viewer: { canCreateLink: false, canDeleteLink: false, canExportReports: true, canCustomizeQr: false, canManageWebhooks: false, canViewAnalytics: true },
+        updatedAt: Date.now(),
+      };
+    }
+
+    return await res.json();
+  }
+
+  // 36. PUT /api/v1/workspaces/{workspaceId}/permissions
+  static async updateWorkspacePermissionMatrix(
+    workspaceId: string,
+    request: UpdatePermissionMatrixRequest,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<WorkspacePermissionMatrixResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces/${workspaceId}/permissions`, {
+      method: 'PUT',
+      headers: this.getHeaders(lang, authUser),
+      body: JSON.stringify(request),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'İzin matrisi güncellenemedi.');
     }
 
     return await res.json();
