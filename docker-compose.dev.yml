@@ -1,5 +1,5 @@
 services:
-  # 1. PostgreSQL 16 Production Database
+  # 1. PostgreSQL 16 Database
   postgres:
     image: postgres:16-alpine
     container_name: klink_postgres
@@ -18,7 +18,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Redis 7 In-Memory Cache & Rate Limiter
+  # 2. Redis 7 Cache & Rate Limiter
   redis:
     image: redis:7-alpine
     container_name: klink_redis
@@ -34,7 +34,7 @@ services:
       timeout: 3s
       retries: 5
 
-  # 3. RabbitMQ 3 Management (Telemetry Queue Broker)
+  # 3. RabbitMQ 3 Management (Async Analytics)
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: klink_rabbitmq
@@ -53,11 +53,11 @@ services:
       timeout: 10s
       retries: 5
 
-  # 4. Klink Spring Boot 3 Backend (Production Multi-stage Jar)
+  # 4. Klink Spring Boot Backend (Hot Reload Modu)
   backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: klink_backend
     restart: unless-stopped
     depends_on:
@@ -83,14 +83,18 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000}
       GOOGLE_SAFE_BROWSING_API_KEY: ${GOOGLE_SAFE_BROWSING_API_KEY:-}
       VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
+    volumes:
+      - ./src:/app/src
+      - ./pom.xml:/app/pom.xml
+      - maven_cache:/root/.m2
     ports:
       - "8080:8080"
 
-  # 5. Klink Next.js 16 Frontend (Production Standalone Build)
+  # 5. Klink Next.js Frontend (Hot Reload Modu)
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
         NEXT_PUBLIC_APP_DOMAIN: ${NEXT_PUBLIC_APP_DOMAIN:-http://localhost:3000}
@@ -99,9 +103,15 @@ services:
     depends_on:
       - backend
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
       NEXT_PUBLIC_APP_DOMAIN: ${NEXT_PUBLIC_APP_DOMAIN:-http://localhost:3000}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
     ports:
       - "3000:3000"
 
@@ -109,3 +119,4 @@ volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
+  maven_cache:

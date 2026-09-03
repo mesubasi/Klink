@@ -1,0 +1,19 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Bagimliliklari kopyala ve yukle
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Kaynak kodlari kopyala
+COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NODE_ENV=development \
+    WATCHPACK_POLLING=true
+
+EXPOSE 3000
+
+# Gelistirme sunucusunu Fast Refresh (Hot Reload) ile baslat
+CMD ["npm", "run", "dev"]

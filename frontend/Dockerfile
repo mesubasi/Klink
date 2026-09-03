@@ -9,10 +9,14 @@ RUN npm ci
 
 # 3. Builder
 FROM base AS builder
+ARG NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+ARG NEXT_PUBLIC_APP_DOMAIN=http://localhost:3000
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    NODE_ENV=production
+    NODE_ENV=production \
+    NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_APP_DOMAIN=$NEXT_PUBLIC_APP_DOMAIN
 RUN npm run build
 
 # 4. Production Runner

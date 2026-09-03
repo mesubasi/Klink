@@ -1,0 +1,15 @@
+FROM maven:3.9.6-eclipse-temurin-17-alpine
+
+WORKDIR /app
+
+# Maven bagimliliklarini onbellege al
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# Kaynak kodlari kopyala
+COPY src ./src
+
+EXPOSE 8080
+
+# Spring Boot DevTools ile canli Hot Reload modunda baslat
+CMD ["mvn", "spring-boot:run"]
