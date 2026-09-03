@@ -117,9 +117,9 @@ export default function AdminCrmPage() {
       }
     }
 
-    // Production ortamında default admin girişi yaptırma -> Login'e yönlendir
+    // Production ortamında default admin girişi yaptırma -> Admin Login'e yönlendir
     if (process.env.NODE_ENV === 'production') {
-      window.location.href = '/login?redirect=/admin';
+      window.location.href = '/admin/login';
     } else {
       // Yalnızca yerel geliştirme (development) modunda test admin fallback'i
       setAdminAuth({ u: 'admin', p: 'admin123', role: 'ROLE_ADMIN' });
@@ -132,10 +132,11 @@ export default function AdminCrmPage() {
     setLoading(true);
     setErrorMsg('');
     try {
-      const [links, telemetry, keys] = await Promise.all([
+      const [links, telemetry, keys, users] = await Promise.all([
         ApiClient.getAllUrls(lang, adminAuth as any),
         ApiClient.getSystemStatus(lang, adminAuth as any),
-        ApiClient.getAdminApiKeys(undefined, lang, adminAuth as any)
+        ApiClient.getAdminApiKeys(undefined, lang, adminAuth as any),
+        ApiClient.getAdminUsers(lang, adminAuth as any)
       ]);
       setAllLinks(links);
       if (telemetry) {
@@ -143,6 +144,9 @@ export default function AdminCrmPage() {
       }
       if (keys) {
         setApiKeys(keys);
+      }
+      if (users && users.length > 0) {
+        setUsersList(users);
       }
     } catch (e: any) {
       setErrorMsg(e.message || 'API bağlantı hatası!');
@@ -222,22 +226,40 @@ export default function AdminCrmPage() {
     } finally {
       localStorage.removeItem('klink_user');
       localStorage.removeItem('swiftlink_user');
-      window.location.href = '/login';
+      window.location.href = '/admin/login';
     }
   };
 
-  const handleToggleAdminRole = (userId: string) => {
-    setUsersList((prev) =>
-      prev.map((u) =>
-        u.id === userId
-          ? { ...u, role: u.role === 'ROLE_ADMIN' ? 'ROLE_USER' : 'ROLE_ADMIN' }
-          : u
-      )
-    );
+  const handleToggleAdminRole = async (userId: string) => {
+    const user = usersList.find((u) => u.id === userId);
+    if (!user) return;
+    const targetRole = user.role === 'ROLE_ADMIN' ? 'ROLE_USER' : 'ROLE_ADMIN';
+    try {
+      const updated = await ApiClient.updateAdminUserRole(userId, targetRole, lang, adminAuth as any);
+      setUsersList((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, role: updated.role } : u))
+      );
+      setActionSuccessMsg(`@${user.username} kullanıcısının rolü başarıyla veritabanında güncellendi.`);
+      setTimeout(() => setActionSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Rol güncellenirken hata oluştu.');
+      setTimeout(() => setErrorMsg(''), 5000);
+    }
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setUsersList((prev) => prev.filter((u) => u.id !== userId));
+  const handleDeleteUser = async (userId: string) => {
+    const user = usersList.find((u) => u.id === userId);
+    if (!user) return;
+    if (!confirm(`@${user.username} kullanıcısını sistemden kalıcı olarak silmek istediğinize emin misiniz?`)) return;
+    try {
+      await ApiClient.deleteAdminUser(userId, lang, adminAuth as any);
+      setUsersList((prev) => prev.filter((u) => u.id !== userId));
+      setActionSuccessMsg(`@${user.username} kullanıcısı sistemden kalıcı olarak silindi.`);
+      setTimeout(() => setActionSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Kullanıcı silinemedi.');
+      setTimeout(() => setErrorMsg(''), 5000);
+    }
   };
 
   const handleAdminDeleteLink = async (shortCode: string) => {

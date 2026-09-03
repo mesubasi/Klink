@@ -34,7 +34,17 @@ import {
   UpdateAbTestConfigRequest
 } from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith('http')) {
+      return process.env.NEXT_PUBLIC_API_URL;
+    }
+    return 'http://localhost:8080/api/v1';
+  }
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export class ApiClient {
   private static getHeaders(lang: string = 'tr', authUser?: { u?: string; p?: string; token?: string }): HeadersInit {
@@ -1112,6 +1122,59 @@ export class ApiClient {
     }
 
     return await res.json();
+  }
+
+  // 27.1 GET /api/v1/admin/users
+  static async getAdminUsers(
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<UserDto[]> {
+    const res = await this.safeFetch(`${API_BASE_URL}/admin/users`, {
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      return [];
+    }
+
+    return await res.json();
+  }
+
+  // 27.2 PATCH /api/v1/admin/users/{userId}/role?role=ROLE_ADMIN|ROLE_USER
+  static async updateAdminUserRole(
+    userId: string,
+    role: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<UserDto> {
+    const res = await this.safeFetch(`${API_BASE_URL}/admin/users/${userId}/role?role=${role}`, {
+      method: 'PATCH',
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      const err = await res?.json().catch(() => null);
+      throw new Error(err?.message || 'Kullanıcı rolü güncellenemedi.');
+    }
+
+    return await res.json();
+  }
+
+  // 27.3 DELETE /api/v1/admin/users/{userId}
+  static async deleteAdminUser(
+    userId: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<void> {
+    const res = await this.safeFetch(`${API_BASE_URL}/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      const err = await res?.json().catch(() => null);
+      throw new Error(err?.message || 'Kullanıcı silinemedi.');
+    }
   }
 
   // 28. POST /api/v1/workspaces
