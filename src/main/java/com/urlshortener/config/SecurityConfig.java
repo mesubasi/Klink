@@ -66,8 +66,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/2fa/verify-login").permitAll()
                 // Swagger UI & OpenAPI Dokümanları
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                // H2 Veritabanı Konsolu ve Statik Kaynaklar
-                .requestMatchers("/h2-console/**", "/error", "/css/**", "/js/**", "/index.html", "/").permitAll()
+                // Actuator Healthcheck, H2 Konsolu ve Statik Kaynaklar
+                .requestMatchers("/actuator/health", "/actuator/health/**", "/h2-console/**", "/error", "/css/**", "/js/**", "/index.html", "/").permitAll()
                 
                 // Admin Özel Telemetri ve CRM Endpoint'leri (Yalnızca ROLE_ADMIN erişebilir)
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
