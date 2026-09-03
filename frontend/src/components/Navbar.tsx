@@ -25,9 +25,10 @@ export const Navbar: React.FC<NavbarProps> = ({ lang, onLanguageChange, username
     } catch (e) {
       console.error(e);
     } finally {
+      const isAdmin = username === 'admin';
       localStorage.removeItem('klink_user');
       localStorage.removeItem('swiftlink_user');
-      window.location.href = '/login';
+      window.location.href = isAdmin ? '/admin/login' : '/login';
     }
   };
 

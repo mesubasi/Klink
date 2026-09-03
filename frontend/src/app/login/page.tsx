@@ -130,28 +130,16 @@ export default function LoginPage() {
                 {process.env.NODE_ENV !== 'production' && (
                   <div className="space-y-1.5 p-3 rounded-2xl bg-zinc-50 border border-zinc-200/70">
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider text-center">Geliştirme Modu: Hızlı Test Girişi</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQuickFill('user', 'password')}
-                        className="bg-white text-xs h-8"
-                      >
-                        <User className="w-3.5 h-3.5 text-zinc-500 mr-1" />
-                        <span>Kullanıcı</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQuickFill('admin', 'admin123')}
-                        className="bg-white text-xs h-8"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5 text-zinc-500 mr-1" />
-                        <span>Yönetici</span>
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleQuickFill('user', 'password')}
+                      className="w-full bg-white text-xs h-8"
+                    >
+                      <User className="w-3.5 h-3.5 text-zinc-500 mr-1" />
+                      <span>Test Kullanıcısı (user / password)</span>
+                    </Button>
                   </div>
                 )}
 
@@ -296,11 +284,17 @@ export default function LoginPage() {
             )}
           </CardContent>
 
-          <CardFooter className="justify-center border-t border-zinc-100 pt-4">
+          <CardFooter className="justify-center border-t border-zinc-100 pt-4 flex flex-col gap-2 text-center">
             <p className="text-xs text-zinc-500">
               Hesabınız yok mu?{' '}
               <Link href="/register" className="font-semibold text-zinc-950 hover:underline">
                 Kayıt Olun
+              </Link>
+            </p>
+            <p className="text-[11px] text-zinc-400">
+              Sistem Yöneticisi misiniz?{' '}
+              <Link href="/admin/login" className="font-semibold text-zinc-800 hover:underline">
+                Yönetici Portalı
               </Link>
             </p>
           </CardFooter>
