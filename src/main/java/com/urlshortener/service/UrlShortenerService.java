@@ -6,12 +6,14 @@ import com.urlshortener.exception.UrlNotFoundException;
 import com.urlshortener.messaging.ClickEventPublisher;
 import com.urlshortener.model.ClickAnalytics;
 import com.urlshortener.model.UrlMapping;
+import com.urlshortener.model.UrlVariant;
 import com.urlshortener.model.UserAccount;
 import com.urlshortener.model.Workspace;
 import com.urlshortener.model.WorkspaceMember;
 import com.urlshortener.model.WorkspaceRole;
 import com.urlshortener.repository.ClickAnalyticsRepository;
 import com.urlshortener.repository.UrlMappingRepository;
+import com.urlshortener.repository.UrlVariantRepository;
 import com.urlshortener.repository.UserRepository;
 import com.urlshortener.repository.WorkspaceMemberRepository;
 import com.urlshortener.repository.WorkspaceRepository;
@@ -58,6 +60,8 @@ public class UrlShortenerService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspacePermissionService workspacePermissionService;
+    private final UrlVariantRepository urlVariantRepository;
+    private final AbTestService abTestService;
 
     @Value("${app.domain:http://localhost:8080}")
     private String domain;
@@ -79,7 +83,9 @@ public class UrlShortenerService {
                                DynamicQrCodeService dynamicQrCodeService,
                                WorkspaceRepository workspaceRepository,
                                WorkspaceMemberRepository workspaceMemberRepository,
-                               WorkspacePermissionService workspacePermissionService) {
+                               WorkspacePermissionService workspacePermissionService,
+                               UrlVariantRepository urlVariantRepository,
+                               AbTestService abTestService) {
         this.urlMappingRepository = urlMappingRepository;
         this.clickAnalyticsRepository = clickAnalyticsRepository;
         this.userRepository = userRepository;
@@ -96,6 +102,8 @@ public class UrlShortenerService {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.workspacePermissionService = workspacePermissionService;
+        this.urlVariantRepository = urlVariantRepository;
+        this.abTestService = abTestService;
     }
 
     @Transactional
@@ -197,12 +205,41 @@ public class UrlShortenerService {
                 .workspace(workspace)
                 .build();
 
-        urlMappingRepository.save(mapping);
-
         boolean hasRestrictions = (blockedCountries != null && !blockedCountries.isEmpty()) || (blockedIps != null && !blockedIps.isEmpty());
         boolean hasDeviceTargeting = iosUrl != null || androidUrl != null || desktopUrl != null;
+        boolean abTestActive = Boolean.TRUE.equals(request.getAbTestingEnabled()) && request.getVariants() != null && !request.getVariants().isEmpty();
 
-        if (!mapping.isPasswordProtected() && !hasRestrictions && !hasDeviceTargeting) {
+        if (abTestActive) {
+            if (request.getVariants().size() < 2) {
+                throw new IllegalArgumentException("A/B testi için en az 2 hedef varyant tanımlanmalıdır.");
+            }
+            int totalWeight = request.getVariants().stream()
+                    .mapToInt(v -> v.getWeightPercent() != null ? v.getWeightPercent() : 0)
+                    .sum();
+            if (totalWeight != 100) {
+                throw new IllegalArgumentException("Varyant ağırlıklarının toplamı tam olarak %100 olmalıdır. Şu anki toplam: %" + totalWeight);
+            }
+            mapping.setAbTestingEnabled(true);
+        }
+
+        urlMappingRepository.save(mapping);
+
+        if (abTestActive) {
+            for (com.urlshortener.dto.UrlVariantRequest vr : request.getVariants()) {
+                UrlVariant variant = UrlVariant.builder()
+                        .urlMapping(mapping)
+                        .label(vr.getLabel() != null ? vr.getLabel().trim() : "Varyant")
+                        .targetUrl(vr.getTargetUrl().trim())
+                        .weightPercent(vr.getWeightPercent())
+                        .clickCount(0L)
+                        .active(true)
+                        .createdAt(System.currentTimeMillis())
+                        .build();
+                urlVariantRepository.save(variant);
+            }
+        }
+
+        if (!mapping.isPasswordProtected() && !hasRestrictions && !hasDeviceTargeting && !abTestActive) {
             cacheUrl(shortCode, originalUrl);
         }
 
@@ -760,6 +797,15 @@ public class UrlShortenerService {
             return mapping.getOriginalUrl();
         }
 
+        // 0. A/B Split Test Check (Trafik Paylaştırma)
+        if (mapping.isAbTestingEnabled()) {
+            UrlVariant variant = abTestService.selectVariant(mapping, request, null);
+            if (variant != null && variant.getTargetUrl() != null && !variant.getTargetUrl().trim().isEmpty()) {
+                log.info("🧪 [A/B Split Test] Varyant seçildi: {} ({}%) -> {}", variant.getLabel(), variant.getWeightPercent(), variant.getTargetUrl());
+                return variant.getTargetUrl().trim();
+            }
+        }
+
         String userAgent = request.getHeader("User-Agent");
         if (userAgent != null && !userAgent.trim().isEmpty()) {
             String uaLower = userAgent.toLowerCase();
@@ -838,6 +884,21 @@ public class UrlShortenerService {
         if (mapping.getWorkspace() != null) {
             builder.workspaceId(mapping.getWorkspace().getId().toString())
                    .workspaceName(mapping.getWorkspace().getName());
+        }
+
+        builder.abTestingEnabled(mapping.isAbTestingEnabled());
+        if (mapping.isAbTestingEnabled()) {
+            List<UrlVariant> variants = urlVariantRepository.findByUrlMappingId(mapping.getId());
+            long totalClicks = variants.stream().mapToLong(UrlVariant::getClickCount).sum();
+            List<com.urlshortener.dto.UrlVariantResponse> variantResponses = variants.stream().map(v -> {
+                double share = totalClicks > 0
+                        ? Math.round(((double) v.getClickCount() / totalClicks) * 1000.0) / 10.0
+                        : 0.0;
+                return new com.urlshortener.dto.UrlVariantResponse(
+                        v.getId(), v.getLabel(), v.getTargetUrl(), v.getWeightPercent(), v.getClickCount(), share, v.isActive(), v.getCreatedAt()
+                );
+            }).toList();
+            builder.variants(variantResponses);
         }
 
         return builder.build();

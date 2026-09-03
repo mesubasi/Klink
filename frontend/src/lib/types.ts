@@ -11,6 +11,8 @@ export interface ShortenRequest {
   webhookUrl?: string;
   webhookSecret?: string;
   workspaceId?: string;
+  abTestingEnabled?: boolean;
+  variants?: UrlVariantRequest[];
 }
 
 export interface ShortenResponse {
@@ -33,6 +35,8 @@ export interface ShortenResponse {
   healthResponseTimeMs?: number;
   workspaceId?: string;
   workspaceName?: string;
+  abTestingEnabled?: boolean;
+  variants?: UrlVariantResponse[];
 }
 
 export interface UrlPreviewResponse {
@@ -332,6 +336,35 @@ export interface WorkspacePermissionMatrixResponse {
 export interface UpdatePermissionMatrixRequest {
   member: RolePermissionDto;
   viewer: RolePermissionDto;
+}
+
+export interface UrlVariantRequest {
+  label: string;
+  targetUrl: string;
+  weightPercent: number;
+}
+
+export interface UrlVariantResponse {
+  id: string;
+  label: string;
+  targetUrl: string;
+  weightPercent: number;
+  clickCount: number;
+  trafficSharePercent: number;
+  active: boolean;
+  createdAt: number;
+}
+
+export interface AbTestConfigResponse {
+  shortCode: string;
+  abTestingEnabled: boolean;
+  variants: UrlVariantResponse[];
+  totalClicks: number;
+}
+
+export interface UpdateAbTestConfigRequest {
+  abTestingEnabled: boolean;
+  variants: UrlVariantRequest[];
 }
 
 

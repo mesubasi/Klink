@@ -84,6 +84,12 @@ public class UrlMapping implements Serializable {
     @JoinColumn(name = "workspace_id")
     private Workspace workspace;
 
+    @Column(nullable = false)
+    private boolean abTestingEnabled = false;
+
+    @OneToMany(mappedBy = "urlMapping", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<UrlVariant> variants = new java.util.ArrayList<>();
+
     public UrlMapping() {}
 
     public UrlMapping(UUID id, String originalUrl, String shortCode, Long createdAt, Long expiresAt, String fallbackUrl, Long clickCount, boolean active, String passwordHash, String blockedCountries, String blockedIps, boolean previewEnabled, String iosUrl, String androidUrl, String desktopUrl, String webhookUrl, String webhookSecret, String healthStatus, Long lastHealthCheck, Integer healthStatusCode, String healthErrorMessage, Long healthResponseTimeMs, UserAccount user) {
@@ -174,6 +180,8 @@ public class UrlMapping implements Serializable {
         private Long healthResponseTimeMs;
         private UserAccount user;
         private Workspace workspace;
+        private boolean abTestingEnabled = false;
+        private java.util.List<UrlVariant> variants = new java.util.ArrayList<>();
 
         public Builder id(UUID id) { this.id = id; return this; }
         public Builder originalUrl(String originalUrl) { this.originalUrl = originalUrl; return this; }
@@ -199,10 +207,16 @@ public class UrlMapping implements Serializable {
         public Builder healthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; return this; }
         public Builder user(UserAccount user) { this.user = user; return this; }
         public Builder workspace(Workspace workspace) { this.workspace = workspace; return this; }
+        public Builder abTestingEnabled(boolean abTestingEnabled) { this.abTestingEnabled = abTestingEnabled; return this; }
+        public Builder variants(java.util.List<UrlVariant> variants) { this.variants = variants; return this; }
 
         public UrlMapping build() {
             UrlMapping mapping = new UrlMapping(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, webhookSecret, healthStatus, lastHealthCheck, healthStatusCode, healthErrorMessage, healthResponseTimeMs, user);
             mapping.setWorkspace(workspace);
+            mapping.setAbTestingEnabled(abTestingEnabled);
+            if (variants != null) {
+                mapping.setVariants(variants);
+            }
             return mapping;
         }
     }
@@ -210,6 +224,11 @@ public class UrlMapping implements Serializable {
     public boolean isPasswordProtected() {
         return passwordHash != null && !passwordHash.trim().isEmpty();
     }
+
+    public boolean isAbTestingEnabled() { return abTestingEnabled; }
+    public void setAbTestingEnabled(boolean abTestingEnabled) { this.abTestingEnabled = abTestingEnabled; }
+    public java.util.List<UrlVariant> getVariants() { return variants; }
+    public void setVariants(java.util.List<UrlVariant> variants) { this.variants = variants; }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

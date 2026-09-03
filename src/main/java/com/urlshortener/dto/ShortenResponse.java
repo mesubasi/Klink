@@ -22,6 +22,8 @@ public class ShortenResponse {
     private Long healthResponseTimeMs;
     private String workspaceId;
     private String workspaceName;
+    private boolean abTestingEnabled;
+    private java.util.List<UrlVariantResponse> variants;
 
     public ShortenResponse() {}
 
@@ -91,6 +93,8 @@ public class ShortenResponse {
         private Long healthResponseTimeMs;
         private String workspaceId;
         private String workspaceName;
+        private boolean abTestingEnabled;
+        private java.util.List<UrlVariantResponse> variants;
 
         public Builder shortCode(String shortCode) { this.shortCode = shortCode; return this; }
         public Builder shortUrl(String shortUrl) { this.shortUrl = shortUrl; return this; }
@@ -113,11 +117,15 @@ public class ShortenResponse {
         public Builder healthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; return this; }
         public Builder workspaceId(String workspaceId) { this.workspaceId = workspaceId; return this; }
         public Builder workspaceName(String workspaceName) { this.workspaceName = workspaceName; return this; }
+        public Builder abTestingEnabled(boolean abTestingEnabled) { this.abTestingEnabled = abTestingEnabled; return this; }
+        public Builder variants(java.util.List<UrlVariantResponse> variants) { this.variants = variants; return this; }
 
         public ShortenResponse build() {
             ShortenResponse resp = new ShortenResponse(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, healthStatus, lastHealthCheck, healthStatusCode, healthErrorMessage, healthResponseTimeMs);
             resp.setWorkspaceId(workspaceId);
             resp.setWorkspaceName(workspaceName);
+            resp.setAbTestingEnabled(abTestingEnabled);
+            resp.setVariants(variants);
             return resp;
         }
     }
@@ -164,4 +172,8 @@ public class ShortenResponse {
     public void setWorkspaceId(String workspaceId) { this.workspaceId = workspaceId; }
     public String getWorkspaceName() { return workspaceName; }
     public void setWorkspaceName(String workspaceName) { this.workspaceName = workspaceName; }
+    public boolean isAbTestingEnabled() { return abTestingEnabled; }
+    public void setAbTestingEnabled(boolean abTestingEnabled) { this.abTestingEnabled = abTestingEnabled; }
+    public java.util.List<UrlVariantResponse> getVariants() { return variants; }
+    public void setVariants(java.util.List<UrlVariantResponse> variants) { this.variants = variants; }
 }

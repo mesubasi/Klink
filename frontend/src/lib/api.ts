@@ -29,7 +29,9 @@ import {
   WorkspaceMemberResponse,
   UpdateMemberRoleRequest,
   WorkspacePermissionMatrixResponse,
-  UpdatePermissionMatrixRequest
+  UpdatePermissionMatrixRequest,
+  AbTestConfigResponse,
+  UpdateAbTestConfigRequest
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
@@ -1289,6 +1291,50 @@ export class ApiClient {
     if (!res || !res.ok) {
       const errorData = await res?.json().catch(() => null);
       throw new Error(errorData?.message || 'İzin matrisi güncellenemedi.');
+    }
+
+    return await res.json();
+  }
+
+  // 37. GET /api/v1/urls/{shortCode}/ab-test
+  static async getAbTestConfig(
+    shortCode: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<AbTestConfigResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/urls/${shortCode}/ab-test`, {
+      method: 'GET',
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      return {
+        shortCode,
+        abTestingEnabled: false,
+        variants: [],
+        totalClicks: 0,
+      };
+    }
+
+    return await res.json();
+  }
+
+  // 38. PUT /api/v1/urls/{shortCode}/ab-test
+  static async updateAbTestConfig(
+    shortCode: string,
+    request: UpdateAbTestConfigRequest,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<AbTestConfigResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/urls/${shortCode}/ab-test`, {
+      method: 'PUT',
+      headers: this.getHeaders(lang, authUser),
+      body: JSON.stringify(request),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'A/B testi ayarları güncellenemedi.');
     }
 
     return await res.json();

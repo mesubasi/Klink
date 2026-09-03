@@ -37,9 +37,18 @@ public class ClickAnalytics implements Serializable {
     @Column(length = 100)
     private String botCategory;
 
+    private UUID variantId;
+
+    @Column(length = 100)
+    private String variantLabel;
+
     public ClickAnalytics() {}
 
     public ClickAnalytics(UUID id, String shortCode, Long clickedAt, String ipAddress, String userAgent, String referrer, String country, String countryCode, String city, boolean bot, String botCategory) {
+        this(id, shortCode, clickedAt, ipAddress, userAgent, referrer, country, countryCode, city, bot, botCategory, null, null);
+    }
+
+    public ClickAnalytics(UUID id, String shortCode, Long clickedAt, String ipAddress, String userAgent, String referrer, String country, String countryCode, String city, boolean bot, String botCategory, UUID variantId, String variantLabel) {
         this.id = id;
         this.shortCode = shortCode;
         this.clickedAt = clickedAt != null ? clickedAt : System.currentTimeMillis();
@@ -51,6 +60,8 @@ public class ClickAnalytics implements Serializable {
         this.city = city;
         this.bot = bot;
         this.botCategory = botCategory;
+        this.variantId = variantId;
+        this.variantLabel = variantLabel;
     }
 
     @PrePersist
@@ -76,6 +87,8 @@ public class ClickAnalytics implements Serializable {
         private String city;
         private boolean bot = false;
         private String botCategory;
+        private UUID variantId;
+        private String variantLabel;
 
         public Builder id(UUID id) { this.id = id; return this; }
         public Builder shortCode(String shortCode) { this.shortCode = shortCode; return this; }
@@ -88,9 +101,11 @@ public class ClickAnalytics implements Serializable {
         public Builder city(String city) { this.city = city; return this; }
         public Builder bot(boolean bot) { this.bot = bot; return this; }
         public Builder botCategory(String botCategory) { this.botCategory = botCategory; return this; }
+        public Builder variantId(UUID variantId) { this.variantId = variantId; return this; }
+        public Builder variantLabel(String variantLabel) { this.variantLabel = variantLabel; return this; }
 
         public ClickAnalytics build() {
-            return new ClickAnalytics(id, shortCode, clickedAt, ipAddress, userAgent, referrer, country, countryCode, city, bot, botCategory);
+            return new ClickAnalytics(id, shortCode, clickedAt, ipAddress, userAgent, referrer, country, countryCode, city, bot, botCategory, variantId, variantLabel);
         }
     }
 
@@ -116,4 +131,8 @@ public class ClickAnalytics implements Serializable {
     public void setBot(boolean bot) { this.bot = bot; }
     public String getBotCategory() { return botCategory; }
     public void setBotCategory(String botCategory) { this.botCategory = botCategory; }
+    public UUID getVariantId() { return variantId; }
+    public void setVariantId(UUID variantId) { this.variantId = variantId; }
+    public String getVariantLabel() { return variantLabel; }
+    public void setVariantLabel(String variantLabel) { this.variantLabel = variantLabel; }
 }

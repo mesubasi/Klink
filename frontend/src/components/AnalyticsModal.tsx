@@ -15,10 +15,12 @@ import {
   Mail,
   Flame,
   CheckCircle2,
-  Clock
+  Clock,
+  Split,
+  Trophy
 } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
-import { AnalyticsSummaryResponse } from '@/lib/types';
+import { AnalyticsSummaryResponse, AbTestConfigResponse } from '@/lib/types';
 import { ApiClient } from '@/lib/api';
 import {
   Dialog,
@@ -44,6 +46,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
   onClose,
 }) => {
   const [data, setData] = useState<AnalyticsSummaryResponse | null>(null);
+  const [abTestConfig, setAbTestConfig] = useState<AbTestConfigResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailSentMessage, setEmailSentMessage] = useState('');
@@ -57,8 +60,14 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
     if (!shortCode) return;
     setLoading(true);
     setEmailSentMessage('');
-    ApiClient.getAnalyticsSummary(shortCode, lang, authUser)
-      .then((res) => setData(res))
+    Promise.all([
+      ApiClient.getAnalyticsSummary(shortCode, lang, authUser),
+      ApiClient.getAbTestConfig(shortCode, lang, authUser)
+    ])
+      .then(([analyticsRes, abRes]) => {
+        setData(analyticsRes);
+        setAbTestConfig(abRes);
+      })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   }, [shortCode, lang, authUser]);
@@ -195,6 +204,107 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                 <span>Canlı Teleometri</span>
               </div>
             </div>
+
+            {/* A/B Split Test Performance Comparison Card */}
+            {abTestConfig && abTestConfig.abTestingEnabled && abTestConfig.variants && abTestConfig.variants.length > 0 && (
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/5 via-zinc-50 to-emerald-500/5 dark:from-emerald-950/20 dark:via-zinc-900/50 dark:to-emerald-950/20 border border-emerald-500/20 dark:border-emerald-800/40 space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Split className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-zinc-950 dark:text-zinc-100 text-xs flex items-center gap-1.5">
+                        <span>{lang === 'tr' ? 'A/B Split Test Kıyaslama Raporu' : 'A/B Split Traffic Comparison'}</span>
+                        <Badge className="text-[10px] bg-emerald-600 text-white font-medium">
+                          {lang === 'tr' ? 'Canlı Test' : 'Live Test'}
+                        </Badge>
+                      </h4>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {lang === 'tr'
+                          ? `Gelen ${abTestConfig.totalClicks} tık ${abTestConfig.variants.length} farklı varyanta dağıtıldı.`
+                          : `Total ${abTestConfig.totalClicks} clicks distributed across ${abTestConfig.variants.length} variants.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 self-start sm:self-auto">
+                    {lang === 'tr' ? 'Toplam Varyant Tıklaması:' : 'Variant Clicks:'} <strong className="text-emerald-600 dark:text-emerald-400">{abTestConfig.totalClicks}</strong>
+                  </span>
+                </div>
+
+                {/* Visual Distribution Bar */}
+                <div className="h-3 w-full rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800">
+                  {abTestConfig.variants.map((v, i) => {
+                    const colors = [
+                      'bg-emerald-500',
+                      'bg-blue-500',
+                      'bg-purple-500',
+                      'bg-amber-500',
+                      'bg-rose-500'
+                    ];
+                    const bg = colors[i % colors.length];
+                    const percent = abTestConfig.totalClicks > 0 
+                      ? Math.max(2, Math.round((v.clickCount / abTestConfig.totalClicks) * 100))
+                      : v.weightPercent;
+                    return (
+                      <div
+                        key={v.id || i}
+                        style={{ width: `${percent}%` }}
+                        className={`${bg} h-full transition-all`}
+                        title={`${v.label}: %${percent} (${v.clickCount} tık)`}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* Variant Detailed Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {(() => {
+                    const maxClicks = Math.max(...abTestConfig.variants.map(v => v.clickCount), 0);
+                    return abTestConfig.variants.map((variant, idx) => {
+                      const isLeader = maxClicks > 0 && variant.clickCount === maxClicks;
+                      return (
+                        <div
+                          key={variant.id || idx}
+                          className={`p-3 rounded-xl bg-white dark:bg-zinc-900 border transition-all ${
+                            isLeader
+                              ? 'border-emerald-500/50 dark:border-emerald-500/40 shadow-xs ring-1 ring-emerald-500/20'
+                              : 'border-zinc-200/80 dark:border-zinc-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1 mb-1.5">
+                            <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                              {variant.label}
+                            </span>
+                            {isLeader && (
+                              <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1">
+                                <Trophy className="w-3 h-3 text-emerald-500" />
+                                {lang === 'tr' ? 'Lider' : 'Winner'}
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500 dark:text-zinc-400 mb-1">
+                            <span>{lang === 'tr' ? 'Hedef Ağırlık:' : 'Target Weight:'} %{variant.weightPercent}</span>
+                            <span className="font-bold text-zinc-900 dark:text-zinc-100">{variant.clickCount} {lang === 'tr' ? 'tık' : 'clicks'}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-zinc-100 dark:border-zinc-800">
+                            <span className="text-zinc-400 dark:text-zinc-500 truncate max-w-[170px]" title={variant.targetUrl}>
+                              {variant.targetUrl}
+                            </span>
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
+                              %{variant.trafficSharePercent ?? 0}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
 
             {/* Hourly Click Heatmap Matrix (Saatlik Isı Haritası) */}
             <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/80 space-y-3">

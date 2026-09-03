@@ -24,7 +24,11 @@ import {
   ChevronDown,
   ChevronUp,
   Webhook,
-  Radio
+  Radio,
+  Split,
+  Plus,
+  Trash2,
+  PieChart
 } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
 import { ShortenRequest, ShortenResponse } from '@/lib/types';
@@ -66,6 +70,12 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDeviceTargeting, setShowDeviceTargeting] = useState(false);
   const [showWebhook, setShowWebhook] = useState(false);
+  const [showAbTest, setShowAbTest] = useState(false);
+  const [abTestingEnabled, setAbTestingEnabled] = useState(false);
+  const [variants, setVariants] = useState<Array<{ label: string; targetUrl: string; weightPercent: number }>>([
+    { label: 'Varyant A', targetUrl: '', weightPercent: 50 },
+    { label: 'Varyant B', targetUrl: '', weightPercent: 50 },
+  ]);
 
   // Extract domain preview
   const getDomainPreview = (url: string) => {
@@ -96,8 +106,29 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
     setErrorMsg('');
     setResult(null);
 
+    if (abTestingEnabled) {
+      if (variants.length < 2) {
+        setErrorMsg(lang === 'tr' ? 'A/B testi için en az 2 varyant tanımlamalısınız.' : 'Define at least 2 variants for A/B testing.');
+        setLoading(false);
+        return;
+      }
+      const totalW = variants.reduce((acc, v) => acc + (Number(v.weightPercent) || 0), 0);
+      if (totalW !== 100) {
+        setErrorMsg(lang === 'tr' ? `A/B varyant ağırlıklarının toplamı tam olarak %100 olmalıdır. Şu anki toplam: %${totalW}` : `Total variant weights must equal 100%. Current: ${totalW}%`);
+        setLoading(false);
+        return;
+      }
+      for (let i = 0; i < variants.length; i++) {
+        if (!variants[i].targetUrl.trim()) {
+          setErrorMsg(lang === 'tr' ? `Lütfen ${variants[i].label} için geçerli bir hedef URL girin.` : `Please enter a target URL for ${variants[i].label}.`);
+          setLoading(false);
+          return;
+        }
+      }
+    }
+
     const req: ShortenRequest = {
-      originalUrl: originalUrl.trim(),
+      originalUrl: originalUrl.trim() || (abTestingEnabled && variants[0]?.targetUrl ? variants[0].targetUrl.trim() : ''),
       customAlias: customAlias.trim() || undefined,
       expirationDays: expirationDays ? Number(expirationDays) : undefined,
       password: password.trim() || undefined,
@@ -107,6 +138,12 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
       desktopUrl: desktopUrl.trim() || undefined,
       webhookUrl: webhookUrl.trim() || undefined,
       webhookSecret: webhookSecret.trim() || undefined,
+      abTestingEnabled: abTestingEnabled,
+      variants: abTestingEnabled ? variants.map(v => ({
+        label: v.label.trim(),
+        targetUrl: v.targetUrl.trim(),
+        weightPercent: Number(v.weightPercent)
+      })) : undefined,
     };
 
     try {
@@ -122,6 +159,11 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
       setDesktopUrl('');
       setWebhookUrl('');
       setWebhookSecret('');
+      setAbTestingEnabled(false);
+      setVariants([
+        { label: 'Varyant A', targetUrl: '', weightPercent: 50 },
+        { label: 'Varyant B', targetUrl: '', weightPercent: 50 },
+      ]);
     } catch (err: any) {
       setErrorMsg(err.message || t.msgError);
     } finally {
@@ -482,6 +524,154 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* A/B Split Test Section (A/B Trafik Dağıtımı) */}
+              <div className="border border-zinc-200/80 rounded-2xl overflow-hidden bg-white shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => setShowAbTest(!showAbTest)}
+                  className="w-full px-4 py-3 bg-zinc-50/50 hover:bg-zinc-100/50 flex items-center justify-between transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <Split className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-zinc-900">
+                      {lang === 'tr' ? '🧪 A/B Split Test (Çoklu Hedef URL Trafik Dağıtımı)' : '🧪 A/B Split Traffic Distribution'}
+                    </span>
+                    {abTestingEnabled && (
+                      <Badge className="text-[10px] bg-emerald-600 text-white font-medium">
+                        {lang === 'tr' ? 'Aktif' : 'Active'} ({variants.length} Varyant)
+                      </Badge>
+                    )}
+                  </div>
+                  {showAbTest ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
+                </button>
+
+                {showAbTest && (
+                  <div className="p-4 bg-white border-t border-zinc-100 space-y-4 animate-fadeIn">
+                    <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+                      <div>
+                        <p className="text-xs font-bold text-zinc-900">
+                          {lang === 'tr' ? 'A/B Test Modunu Aç' : 'Enable A/B Split Testing'}
+                        </p>
+                        <p className="text-[11px] text-zinc-500">
+                          {lang === 'tr' ? 'Gelen ziyaretçileri yüzdelik oranlarla farklı sayfalara paylaştırın.' : 'Distribute incoming traffic across multiple landing pages.'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={abTestingEnabled}
+                        onChange={(e) => setAbTestingEnabled(e.target.checked)}
+                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                    </div>
+
+                    {abTestingEnabled && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-zinc-700">
+                            {lang === 'tr' ? 'Hedef Varyantlar & Yüzdelik Ağırlıklar' : 'Target Variants & Weights'}
+                          </span>
+                          {(() => {
+                            const totalW = variants.reduce((s, v) => s + (Number(v.weightPercent) || 0), 0);
+                            return (
+                              <Badge
+                                variant={totalW === 100 ? 'default' : 'outline'}
+                                className={`text-[11px] font-mono font-bold ${
+                                  totalW === 100
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'text-amber-600 border-amber-300 bg-amber-50'
+                                }`}
+                              >
+                                {totalW === 100
+                                  ? (lang === 'tr' ? 'Toplam: %100 ✓' : 'Total: 100% ✓')
+                                  : (lang === 'tr' ? `Toplam: %${totalW} (Kalan: %${100 - totalW})` : `Total: ${totalW}% (Remaining: ${100 - totalW}%)`)}
+                              </Badge>
+                            );
+                          })()}
+                        </div>
+
+                        {variants.map((variant, idx) => (
+                          <div key={idx} className="p-3 rounded-xl bg-zinc-50/80 border border-zinc-200/80 space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <Input
+                                type="text"
+                                value={variant.label}
+                                onChange={(e) => {
+                                  const updated = [...variants];
+                                  updated[idx].label = e.target.value;
+                                  setVariants(updated);
+                                }}
+                                placeholder={`Varyant ${String.fromCharCode(65 + idx)}`}
+                                className="text-xs font-semibold h-7.5 max-w-[160px] bg-white"
+                              />
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-medium text-zinc-500 font-mono">%</span>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={100}
+                                  value={variant.weightPercent}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    const updated = [...variants];
+                                    updated[idx].weightPercent = val;
+                                    setVariants(updated);
+                                  }}
+                                  className="w-16 h-7.5 text-xs text-center font-bold font-mono bg-white"
+                                />
+                                {variants.length > 2 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                      setVariants(variants.filter((_, i) => i !== idx));
+                                    }}
+                                    className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+
+                            <Input
+                              type="url"
+                              value={variant.targetUrl}
+                              onChange={(e) => {
+                                const updated = [...variants];
+                                updated[idx].targetUrl = e.target.value;
+                                setVariants(updated);
+                              }}
+                              placeholder="https://sirketim.com/kampanya-sayfasi"
+                              className="text-xs font-mono h-8 bg-white"
+                            />
+                          </div>
+                        ))}
+
+                        {variants.length < 5 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const nextLetter = String.fromCharCode(65 + variants.length);
+                              setVariants([
+                                ...variants,
+                                { label: `Varyant ${nextLetter}`, targetUrl: '', weightPercent: 0 }
+                              ]);
+                            }}
+                            className="w-full text-xs font-semibold border-dashed text-zinc-600 hover:text-zinc-900 h-8 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5 mr-1" />
+                            {lang === 'tr' ? 'Yeni Hedef Varyant Ekle' : 'Add New Variant'}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -563,6 +753,31 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
               </Button>
             </div>
           </div>
+
+          {/* A/B Test Variant Banner in Result */}
+          {result.abTestingEnabled && result.variants && result.variants.length > 0 && (
+            <div className="p-3 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                  <Split className="w-3.5 h-3.5" />
+                  {lang === 'tr' ? 'Aktif A/B Trafik Dağıtımı' : 'Active A/B Traffic Split'}
+                </span>
+                <span className="text-[11px] text-zinc-400">
+                  {result.variants.length} {lang === 'tr' ? 'Hedef Sayfa' : 'Targets'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {result.variants.map((v, i) => (
+                  <div key={i} className="p-2 rounded-xl bg-zinc-950/80 border border-zinc-800/80 text-[11px] flex items-center justify-between">
+                    <span className="font-semibold text-zinc-200 truncate">{v.label}</span>
+                    <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30 bg-emerald-950/40">
+                      %{v.weightPercent}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Social Share & Details Bar */}
           <div className="pt-3 border-t border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-zinc-400">

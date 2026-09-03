@@ -46,6 +46,8 @@ public class ClickEventConsumer {
                     .city(clickEvent.getCity() != null ? clickEvent.getCity() : "İstanbul")
                     .bot(clickEvent.isBot())
                     .botCategory(clickEvent.getBotCategory())
+                    .variantId(clickEvent.getVariantId())
+                    .variantLabel(clickEvent.getVariantLabel())
                     .build();
 
             clickAnalyticsRepository.save(analytics);

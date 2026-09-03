@@ -23,7 +23,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  Clock
+  Clock,
+  Split
 } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
 import { ShortenResponse } from '@/lib/types';
@@ -383,6 +384,13 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                           <Badge variant="outline" className="text-[10px] text-purple-800 bg-purple-50/80 border-purple-200" title={`Webhook: ${link.webhookUrl}`}>
                             <Webhook className="w-2.5 h-2.5 mr-0.5 text-purple-600" />
                             <span>Webhook</span>
+                          </Badge>
+                        )}
+
+                        {link.abTestingEnabled && (
+                          <Badge variant="outline" className="text-[10px] text-emerald-800 bg-emerald-50/80 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800" title="A/B Split Test Trafik Dağıtımı Aktif">
+                            <Split className="w-2.5 h-2.5 mr-0.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>A/B Split</span>
                           </Badge>
                         )}
                       </div>
