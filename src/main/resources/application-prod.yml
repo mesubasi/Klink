@@ -14,8 +14,8 @@ spring:
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:klinkdb}?sslmode=prefer}
     driver-class-name: ${DATABASE_DRIVER:org.postgresql.Driver}
-    username: ${DATABASE_USERNAME:klink_admin}
-    password: ${DATABASE_PASSWORD:klink_secret_password}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
@@ -51,8 +51,8 @@ spring:
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:klink_mq}
-    password: ${RABBITMQ_PASSWORD:klink_mq_pass}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
     listener:
       simple:
         retry:
@@ -64,6 +64,9 @@ spring:
 
 app:
   domain: ${APP_DOMAIN:https://klink.to}
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   frontend:
     preview-url: ${FRONTEND_PREVIEW_URL:https://klink.to/preview/%s}
   cors:
