@@ -68,39 +68,8 @@ export default function AdminCrmPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [actionSuccessMsg, setActionSuccessMsg] = useState('');
 
-  const [systemStatus, setSystemStatus] = useState<SystemStatusResponse | null>({
-    overallStatus: 'HEALTHY',
-    timestamp: new Date().toISOString(),
-    redis: {
-      status: 'CONNECTED',
-      host: 'localhost',
-      port: 6379,
-      pingLatencyMs: 2,
-      totalKeys: 28,
-      usedMemory: '1.92MB',
-      redisVersion: '7.2.4',
-      uptimeDays: 14,
-      message: 'Redis önbellek sunucusu aktif ve yanıt veriyor',
-    },
-    rabbitMq: {
-      status: 'CONNECTED',
-      host: 'localhost',
-      port: 5672,
-      virtualHost: '/',
-      queueName: 'url.click.queue',
-      messageCount: 0,
-      consumerCount: 1,
-      exchangeName: 'url.click.exchange',
-      routingKey: 'url.click.routingKey',
-      message: 'RabbitMQ broker aktif ve url.click.queue kuyruğu dinleniyor',
-    },
-  });
-
-  const [usersList, setUsersList] = useState<UserDto[]>([
-    { id: '11111111-1111-1111-1111-111111111111', username: 'admin', email: 'admin@klink.local', role: 'ROLE_ADMIN', createdAt: Date.now() - 3600000 * 48 },
-    { id: '22222222-2222-2222-2222-222222222222', username: 'user', email: 'user@klink.local', role: 'ROLE_USER', createdAt: Date.now() - 3600000 * 24 },
-    { id: '33333333-3333-3333-3333-333333333333', username: 'emin_dev', email: 'emin@example.com', role: 'ROLE_USER', createdAt: Date.now() - 3600000 * 12 },
-  ]);
+  const [systemStatus, setSystemStatus] = useState<SystemStatusResponse | null>(null);
+  const [usersList, setUsersList] = useState<UserDto[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem('klink_user') || localStorage.getItem('swiftlink_user');
@@ -108,7 +77,7 @@ export default function AdminCrmPage() {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.u && parsed.role === 'ROLE_ADMIN') {
-          setAdminAuth({ u: parsed.u, p: parsed.p || 'admin123', token: parsed.token, role: parsed.role });
+          setAdminAuth({ u: parsed.u, p: parsed.p || '', token: parsed.token, role: parsed.role });
           setAuthChecked(true);
           return;
         }
@@ -117,14 +86,8 @@ export default function AdminCrmPage() {
       }
     }
 
-    // Production ortamında default admin girişi yaptırma -> Admin Login'e yönlendir
-    if (process.env.NODE_ENV === 'production') {
-      window.location.href = '/admin/login';
-    } else {
-      // Yalnızca yerel geliştirme (development) modunda test admin fallback'i
-      setAdminAuth({ u: 'admin', p: 'admin123', role: 'ROLE_ADMIN' });
-      setAuthChecked(true);
-    }
+    // Yetkisiz veya giris yapmamis kullanicilari kesinlikle Admin Login'e yonlendir
+    window.location.href = '/admin/login';
   }, []);
 
   const loadAdminData = async () => {
@@ -427,7 +390,9 @@ export default function AdminCrmPage() {
             </div>
             <div>
               <h4 className="text-2xl font-black font-mono text-zinc-950">{usersList.length}</h4>
-              <p className="text-[11px] text-zinc-400 font-medium mt-0.5">2 Admin, 1 Standart Üye</p>
+              <p className="text-[11px] text-zinc-400 font-medium mt-0.5">
+                {usersList.filter(u => u.role === 'ROLE_ADMIN').length} Admin, {usersList.filter(u => u.role !== 'ROLE_ADMIN').length} Standart Üye
+              </p>
             </div>
           </div>
 

@@ -67,7 +67,7 @@ export class ApiClient {
     try {
       return await fetch(url, options);
     } catch (err) {
-      console.warn(`[Klink API Warning] Could not reach backend server at ${url}. Operating in local demo mode.`);
+      console.warn(`[Klink API Warning] Could not reach backend server at ${url}.`);
       return null;
     }
   }
@@ -85,15 +85,7 @@ export class ApiClient {
     });
 
     if (!res) {
-      return {
-        shortCode: request.customAlias || Math.random().toString(36).substring(2, 9),
-        shortUrl: `http://localhost:8080/${request.customAlias || 'demo7x'}`,
-        originalUrl: request.originalUrl,
-        createdAt: Date.now(),
-        expiresAt: request.expiresAt || (request.expirationDays ? Date.now() + request.expirationDays * 86400000 : undefined),
-        clickCount: 0,
-        passwordProtected: !!request.password,
-      };
+      throw new Error('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı ve sunucunun çalıştığını kontrol edin.');
     }
 
     if (!res.ok) {
@@ -121,20 +113,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      const shortenedUrls = request.urls.map((u, i) => ({
-        shortCode: u.customAlias || `bulk${i + 1}`,
-        shortUrl: `http://localhost:8080/bulk${i + 1}`,
-        originalUrl: u.originalUrl,
-        createdAt: Date.now(),
-        clickCount: 0,
-        passwordProtected: !!u.password,
-      }));
-
-      return {
-        totalCount: request.urls.length,
-        successCount: request.urls.length,
-        shortenedUrls,
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Toplu link kısaltma başarısız oldu.');
     }
 
     return await res.json();
@@ -150,32 +130,7 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return [
-        {
-          shortCode: 'github-core',
-          shortUrl: 'http://localhost:8080/github-core',
-          originalUrl: 'https://github.com/spring-projects/spring-boot',
-          createdAt: Date.now() - 3600000 * 24,
-          clickCount: 142,
-          passwordProtected: false,
-        },
-        {
-          shortCode: 'secure-vault',
-          shortUrl: 'http://localhost:8080/secure-vault',
-          originalUrl: 'https://aws.amazon.com/console',
-          createdAt: Date.now() - 3600000 * 48,
-          clickCount: 89,
-          passwordProtected: true,
-        },
-        {
-          shortCode: 'promo2026',
-          shortUrl: 'http://localhost:8080/promo2026',
-          originalUrl: 'https://google.com/search?q=url+shortener',
-          createdAt: Date.now() - 3600000 * 12,
-          clickCount: 312,
-          passwordProtected: false,
-        }
-      ];
+      return [];
     }
 
     return await res.json();
@@ -210,14 +165,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return {
-        shortCode,
-        shortUrl: `http://localhost:8080/${shortCode}`,
-        originalUrl: 'https://example.com',
-        createdAt: Date.now(),
-        clickCount: 10,
-        passwordProtected: false,
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Link durumu güncellenemedi.');
     }
 
     return await res.json();
@@ -235,19 +184,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return {
-        shortCode,
-        shortUrl: `http://localhost:8080/${shortCode}`,
-        originalUrl: 'https://example.com',
-        createdAt: Date.now(),
-        clickCount: 1,
-        passwordProtected: false,
-        healthStatus: 'HEALTHY',
-        lastHealthCheck: Date.now(),
-        healthStatusCode: 200,
-        healthErrorMessage: '200 OK (85ms)',
-        healthResponseTimeMs: 85,
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Sağlık kontrolü başarısız oldu.');
     }
 
     return await res.json();
@@ -264,7 +202,7 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return await this.getMyUrls(lang, authUser || undefined);
+      return [];
     }
 
     return await res.json();
@@ -283,10 +221,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      if (password === 'secret123' || password === 'password' || password === '123456') {
-        return 'https://google.com/secret-destination-unlocked';
-      }
-      throw new Error('Girdiğiniz şifre hatalı!');
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Girdiğiniz şifre hatalı!');
     }
 
     return await res.text();
@@ -302,33 +238,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      const isSecure = true;
-      let mockOriginal = 'https://github.com/spring-projects/spring-boot';
-      if (shortCode === 'secure-vault') {
-        mockOriginal = 'https://aws.amazon.com/console';
-      } else if (shortCode === 'promo2026') {
-        mockOriginal = 'https://google.com/search?q=url+shortener';
-      }
-
-      const domain = mockOriginal.replace(/^https?:\/\//, '').split('/')[0];
-
-      return {
-        shortCode,
-        shortUrl: `http://localhost:8080/${shortCode}`,
-        originalUrl: mockOriginal,
-        domain: domain,
-        protocol: 'https:',
-        secure: isSecure,
-        safetyStatus: 'SAFE',
-        safetyScore: 98,
-        googleSafeBrowsingStatus: 'CLEAN',
-        virusTotalStatus: 'CLEAN',
-        passwordProtected: shortCode === 'secure-vault',
-        previewEnabled: true,
-        createdAt: Date.now(),
-        clickCount: 142,
-        active: true,
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Önizleme verisi alınamadı.');
     }
 
     return await res.json();
@@ -345,13 +256,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      let mockOriginal = 'https://github.com/spring-projects/spring-boot';
-      if (shortCode === 'secure-vault') {
-        mockOriginal = 'https://aws.amazon.com/console';
-      } else if (shortCode === 'promo2026') {
-        mockOriginal = 'https://google.com/search?q=url+shortener';
-      }
-      return { originalUrl: mockOriginal };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Hedef adrese yönlendirilemedi.');
     }
 
     return await res.json();
@@ -461,14 +367,7 @@ export class ApiClient {
     });
 
     if (!res) {
-      return {
-        username: request.username,
-        email: `${request.username}@swiftlink.local`,
-        role: request.username === 'admin' ? 'ROLE_ADMIN' : 'ROLE_USER',
-        message: 'Giriş başarılı!',
-        accessToken: 'mock-jwt-token-demo-mode',
-        tokenType: 'Bearer',
-      };
+      throw new Error('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı ve sunucunun çalıştığını kontrol edin.');
     }
 
     if (!res.ok) {
@@ -491,12 +390,7 @@ export class ApiClient {
     });
 
     if (!res) {
-      return {
-        username: request.username,
-        email: request.email,
-        role: 'ROLE_USER',
-        message: 'Kullanıcı kaydı başarıyla oluşturuldu! Şimdi giriş yapabilirsiniz.',
-      };
+      throw new Error('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı ve sunucunun çalıştığını kontrol edin.');
     }
 
     if (!res.ok) {
@@ -517,13 +411,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return {
-        id: 'usr-uuid-demo-1',
-        username: authUser?.u || 'user',
-        email: `${authUser?.u || 'user'}@swiftlink.local`,
-        role: authUser?.u === 'admin' ? 'ROLE_ADMIN' : 'ROLE_USER',
-        createdAt: Date.now(),
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Kullanıcı oturumu doğrulanamadı.');
     }
 
     return await res.json();
@@ -544,7 +433,7 @@ export class ApiClient {
         username: authUser?.u || 'user',
         email: '',
         role: '',
-        message: 'Oturum başarıyla kapatıldı.',
+        message: 'Oturum kapatıldı.',
       };
     }
 
@@ -563,18 +452,7 @@ export class ApiClient {
     });
 
     if (!res) {
-      if (request.code === '123456') {
-        return {
-          username: request.username,
-          email: `${request.username}@swiftlink.local`,
-          role: request.username === 'admin' ? 'ROLE_ADMIN' : 'ROLE_USER',
-          message: '2FA Doğrulaması Başarılı!',
-          accessToken: 'mock-jwt-token-2fa-verified',
-          tokenType: 'Bearer',
-        };
-      } else {
-        throw new Error('Girdiğiniz 2FA kodu hatalı! (Demo Modu: Test için 123456 kullanın)');
-      }
+      throw new Error('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı ve sunucu durumunu kontrol edin.');
     }
 
     if (!res.ok) {
@@ -596,12 +474,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      const mockSecret = 'JBSWY3DPEHPK3PXP';
-      return {
-        secretKey: mockSecret,
-        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=otpauth://totp/SwiftLink:${authUser?.u || 'user'}?secret=${mockSecret}&issuer=SwiftLink`,
-        otpAuthUrl: `otpauth://totp/SwiftLink:${authUser?.u || 'user'}?secret=${mockSecret}&issuer=SwiftLink`,
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || '2FA kurulumu başlatılamadı.');
     }
 
     return await res.json();
@@ -621,16 +495,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      if (!res && code !== '123456' && code.length !== 6) {
-        throw new Error('Girdiğiniz 6 haneli doğrulama kodu geçersiz!');
-      }
-      return {
-        username: authUser?.u || 'user',
-        email: `${authUser?.u || 'user'}@swiftlink.local`,
-        role: 'ROLE_USER',
-        message: 'İki aşamalı doğrulama (2FA) başarıyla aktif edildi.',
-        twoFactorRequired: false,
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || '2FA doğrulama kodu geçersiz!');
     }
 
     return await res.json();
@@ -649,13 +515,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return {
-        username: authUser?.u || 'user',
-        email: `${authUser?.u || 'user'}@swiftlink.local`,
-        role: 'ROLE_USER',
-        message: 'İki aşamalı doğrulama (2FA) devre dışı bırakıldı.',
-        twoFactorRequired: false,
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || '2FA devre dışı bırakılamadı.');
     }
 
     return await res.json();
@@ -692,39 +553,13 @@ export class ApiClient {
   static async getSystemStatus(
     lang: string = 'tr',
     authUser?: { u?: string; p?: string; token?: string }
-  ): Promise<SystemStatusResponse> {
+  ): Promise<SystemStatusResponse | null> {
     const res = await this.safeFetch(`${API_BASE_URL}/admin/system/status`, {
       headers: this.getHeaders(lang, authUser),
     });
 
     if (!res || !res.ok) {
-      return {
-        overallStatus: 'HEALTHY',
-        timestamp: new Date().toISOString(),
-        redis: {
-          status: 'CONNECTED',
-          host: 'localhost',
-          port: 6379,
-          pingLatencyMs: 1,
-          totalKeys: 28,
-          usedMemory: '1.92MB',
-          redisVersion: '7.2.4',
-          uptimeDays: 14,
-          message: 'Redis önbellek sunucusu aktif ve yanıt veriyor (PONG: PONG)',
-        },
-        rabbitMq: {
-          status: 'CONNECTED',
-          host: 'localhost',
-          port: 5672,
-          virtualHost: '/',
-          queueName: 'url.click.queue',
-          messageCount: 0,
-          consumerCount: 1,
-          exchangeName: 'url.click.exchange',
-          routingKey: 'url.click.routingKey',
-          message: 'RabbitMQ broker aktif. url.click.queue kuyruğunda 0 bekleyen mesaj, 1 aktif tüketici var.',
-        },
-      };
+      return null;
     }
 
     return await res.json();
@@ -741,11 +576,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return {
-        success: true,
-        deletedKeysCount: 14,
-        message: 'Redis önbelleği başarıyla temizlendi.',
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Redis önbelleği temizlenemedi.');
     }
 
     return await res.json();
@@ -761,66 +593,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      // Fallback demo Bio page
-      return {
-        username: username,
-        displayName: username.charAt(0).toUpperCase() + username.slice(1),
-        bioDescription: '🚀 Dijital üretici, yazılım geliştirici ve içerik mimarı. Tüm linklerime ve projelerime aşağıdan ulaşabilirsiniz!',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-        theme: 'classic_dark',
-        socialLinks: JSON.stringify({
-          twitter: 'https://twitter.com',
-          github: 'https://github.com',
-          instagram: 'https://instagram.com',
-          youtube: 'https://youtube.com',
-          linkedin: 'https://linkedin.com',
-          email: 'hello@example.com',
-        }),
-        verified: true,
-        viewCount: 1420,
-        links: [
-          {
-            id: 'mock-1',
-            title: '🌐 Kişisel Web Sitem & Blog',
-            url: 'https://example.com',
-            icon: 'Globe',
-            highlighted: true,
-            active: true,
-            sortOrder: 0,
-            clickCount: 840,
-          },
-          {
-            id: 'mock-2',
-            title: '📦 GitHub Açık Kaynak Projelerim',
-            url: 'https://github.com',
-            icon: 'Github',
-            highlighted: false,
-            active: true,
-            sortOrder: 1,
-            clickCount: 520,
-          },
-          {
-            id: 'mock-3',
-            title: '🎬 YouTube Yazılım Eğitimleri & VLOG',
-            url: 'https://youtube.com',
-            icon: 'Youtube',
-            highlighted: false,
-            active: true,
-            sortOrder: 2,
-            clickCount: 310,
-          },
-          {
-            id: 'mock-4',
-            title: '☕ Bana Bir Kahve Ismarla (Support)',
-            url: 'https://buymeacoffee.com',
-            icon: 'Coffee',
-            highlighted: false,
-            active: true,
-            sortOrder: 3,
-            clickCount: 190,
-          },
-        ],
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Bio sayfası bulunamadı.');
     }
 
     return await res.json();
@@ -852,45 +626,17 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      const username = authUser?.u || 'user';
+      const username = authUser?.u || '';
       return {
         username: username,
         displayName: username,
-        bioDescription: 'Klink Bio sayfama hoş geldiniz! Projelerime ve sosyal hesaplarıma göz atın.',
+        bioDescription: '',
         avatarUrl: '',
         theme: 'classic_dark',
-        socialLinks: JSON.stringify({
-          twitter: '',
-          github: '',
-          instagram: '',
-          youtube: '',
-          linkedin: '',
-          email: '',
-        }),
+        socialLinks: JSON.stringify({}),
         verified: false,
         viewCount: 0,
-        links: [
-          {
-            id: 'sample-1',
-            title: '🌐 Web Sitem',
-            url: 'https://example.com',
-            icon: 'Globe',
-            highlighted: true,
-            active: true,
-            sortOrder: 0,
-            clickCount: 0,
-          },
-          {
-            id: 'sample-2',
-            title: '🚀 Son Projem',
-            url: 'https://github.com',
-            icon: 'Sparkles',
-            highlighted: false,
-            active: true,
-            sortOrder: 1,
-            clickCount: 0,
-          },
-        ],
+        links: [],
       };
     }
 
@@ -910,17 +656,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return {
-        username: req.username || authUser?.u || 'user',
-        displayName: req.displayName,
-        bioDescription: req.bioDescription,
-        avatarUrl: req.avatarUrl,
-        theme: req.theme || 'classic_dark',
-        socialLinks: req.socialLinks,
-        verified: false,
-        viewCount: 15,
-        links: req.links,
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Bio sayfası güncellenemedi.');
     }
 
     return await res.json();
@@ -939,19 +676,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return {
-        id: 'mock-key-' + Date.now(),
-        appName: req.appName,
-        purpose: req.purpose,
-        websiteUrl: req.websiteUrl,
-        expectedMonthlyClicks: req.expectedMonthlyClicks || '1.000 - 10.000',
-        ipWhitelist: req.ipWhitelist,
-        status: 'PENDING',
-        rateLimitPerMinute: 60,
-        totalCalls: 0,
-        createdAt: Date.now(),
-        username: authUser?.u || 'user',
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'API başvurusu gönderilemedi.');
     }
 
     return await res.json();
@@ -1003,37 +729,7 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return [
-        {
-          id: 'demo-app-1',
-          keyPrefix: 'kl_live_8f3a9b...',
-          appName: 'E-Ticaret Sipariş Botu',
-          purpose: 'Müşterilere SMS ile kargo takip linki göndermek',
-          websiteUrl: 'https://myshop.example.com',
-          expectedMonthlyClicks: '10.000 - 50.000',
-          status: 'PENDING',
-          rateLimitPerMinute: 120,
-          totalCalls: 0,
-          createdAt: Date.now() - 3600000 * 2,
-          username: 'demo_user',
-          userEmail: 'demo@example.com',
-        },
-        {
-          id: 'demo-app-2',
-          keyPrefix: 'kl_live_44aa12...',
-          appName: 'Mobil Uygulama Link Motoru',
-          purpose: 'Mobil uygulama içinden dinamik referans linki üretimi',
-          websiteUrl: 'https://myapp.io',
-          expectedMonthlyClicks: '50.000+',
-          status: 'APPROVED',
-          rateLimitPerMinute: 300,
-          totalCalls: 1450,
-          createdAt: Date.now() - 3600000 * 48,
-          approvedAt: Date.now() - 3600000 * 40,
-          username: 'app_developer',
-          userEmail: 'dev@myapp.io',
-        },
-      ];
+      return [];
     }
 
     return await res.json();
@@ -1053,17 +749,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return {
-        id,
-        appName: 'Onaylanan Uygulama',
-        purpose: 'API Kullanımı',
-        keyPrefix: 'kl_live_generated...',
-        status: 'APPROVED',
-        rateLimitPerMinute: req?.rateLimitPerMinute || 120,
-        totalCalls: 0,
-        createdAt: Date.now(),
-        approvedAt: Date.now(),
-      };
+      const err = await res?.json().catch(() => null);
+      throw new Error(err?.message || 'API başvurusu onaylanamadı.');
     }
 
     return await res.json();
@@ -1083,16 +770,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return {
-        id,
-        appName: 'Reddedilen Uygulama',
-        purpose: 'API Kullanımı',
-        status: 'REJECTED',
-        rejectionReason: req?.rejectionReason || 'Kriterler karşılanamadı',
-        rateLimitPerMinute: 60,
-        totalCalls: 0,
-        createdAt: Date.now(),
-      };
+      const err = await res?.json().catch(() => null);
+      throw new Error(err?.message || 'API başvurusu reddedilemedi.');
     }
 
     return await res.json();
@@ -1110,15 +789,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      return {
-        id,
-        appName: 'İptal Edilen Anahtar',
-        purpose: 'API Kullanımı',
-        status: 'REVOKED',
-        rateLimitPerMinute: 0,
-        totalCalls: 0,
-        createdAt: Date.now(),
-      };
+      const err = await res?.json().catch(() => null);
+      throw new Error(err?.message || 'API anahtarı iptal edilemedi.');
     }
 
     return await res.json();
@@ -1324,15 +996,8 @@ export class ApiClient {
     });
 
     if (!res || !res.ok) {
-      // Fallback varsayılan matris
-      return {
-        workspaceId,
-        workspaceName: 'Çalışma Alanı',
-        admin: { canCreateLink: true, canDeleteLink: true, canExportReports: true, canCustomizeQr: true, canManageWebhooks: true, canViewAnalytics: true },
-        member: { canCreateLink: true, canDeleteLink: true, canExportReports: true, canCustomizeQr: true, canManageWebhooks: false, canViewAnalytics: true },
-        viewer: { canCreateLink: false, canDeleteLink: false, canExportReports: true, canCustomizeQr: false, canManageWebhooks: false, canViewAnalytics: true },
-        updatedAt: Date.now(),
-      };
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'İzin matrisi yüklenemedi.');
     }
 
     return await res.json();

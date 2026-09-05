@@ -73,14 +73,8 @@ export default function UserDashboardPage() {
       }
     }
 
-    // Production ortamında default veri ile girişe izin verilmez -> Login'e yönlendir
-    if (process.env.NODE_ENV === 'production') {
-      window.location.href = '/login?redirect=/dashboard';
-    } else {
-      // Yalnızca yerel geliştirme (development) modunda test kullanıcısı fallback'i
-      setAuthUser({ u: 'user', p: 'password', role: 'ROLE_USER' });
-      setAuthChecked(true);
-    }
+    // Oturum acilmamissa kullaniciyi dogrudan Login sayfasina yonlendir
+    window.location.href = '/login?redirect=/dashboard';
   }, []);
 
   const fetchUserData = async () => {

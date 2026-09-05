@@ -126,23 +126,6 @@ export default function LoginPage() {
           <CardContent className="space-y-4">
             {step === 'credentials' ? (
               <>
-                {/* Quick Demo Fill Buttons - Only displayed in non-production */}
-                {process.env.NODE_ENV !== 'production' && (
-                  <div className="space-y-1.5 p-3 rounded-2xl bg-zinc-50 border border-zinc-200/70">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider text-center">Geliştirme Modu: Hızlı Test Girişi</p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuickFill('user', 'password')}
-                      className="w-full bg-white text-xs h-8"
-                    >
-                      <User className="w-3.5 h-3.5 text-zinc-500 mr-1" />
-                      <span>Test Kullanıcısı (user / password)</span>
-                    </Button>
-                  </div>
-                )}
-
                 <form onSubmit={handleLogin} className="space-y-3.5 pt-1">
                   {/* Username Input */}
                   <div className="space-y-1">
