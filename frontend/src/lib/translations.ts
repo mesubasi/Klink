@@ -29,6 +29,11 @@ export const translations = {
     inputAliasPlaceholder: "Özel Takma Ad (İsteğe bağlı, örn: yaz-kampanyasi)",
     inputExpirePlaceholder: "Geçerlilik (Gün)",
     inputPasswordPlaceholder: "Erişim Şifresi (İsteğe bağlı)",
+    inputMaxClicksPlaceholder: "Tıklama Sınırı (İsteğe bağlı, örn: 100)",
+    inputFallbackUrlPlaceholder: "Yedek URL (Limit dolunca yönlendirilecek adres)",
+    clickCapLabel: "Tıklama Sınırı (Click Cap)",
+    fallbackUrlLabel: "Yedek URL (Fallback)",
+    statusLimitReached: "Limit Doldu",
     btnShorten: "Linki Kısalt",
     btnShortening: "Kısaltılıyor...",
     
@@ -197,6 +202,11 @@ export const translations = {
     inputAliasPlaceholder: "Custom Alias (Optional, e.g. summer-sale)",
     inputExpirePlaceholder: "Expiration (Days)",
     inputPasswordPlaceholder: "Access Password (Optional)",
+    inputMaxClicksPlaceholder: "Click Limit (Optional, e.g. 100)",
+    inputFallbackUrlPlaceholder: "Fallback URL (When quota is reached)",
+    clickCapLabel: "Click Cap Limit",
+    fallbackUrlLabel: "Fallback URL",
+    statusLimitReached: "Limit Reached",
     btnShorten: "Shorten Link",
     btnShortening: "Shortening...",
 

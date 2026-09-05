@@ -28,7 +28,8 @@ import {
   Split,
   Plus,
   Trash2,
-  PieChart
+  PieChart,
+  MousePointerClick
 } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
 import { ShortenRequest, ShortenResponse } from '@/lib/types';
@@ -56,6 +57,8 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
   const [originalUrl, setOriginalUrl] = useState('');
   const [customAlias, setCustomAlias] = useState('');
   const [expirationDays, setExpirationDays] = useState<number | ''>('');
+  const [maxClicks, setMaxClicks] = useState<number | ''>('');
+  const [fallbackUrl, setFallbackUrl] = useState('');
   const [password, setPassword] = useState('');
   const [previewEnabled, setPreviewEnabled] = useState(false);
   const [iosUrl, setIosUrl] = useState('');
@@ -131,6 +134,8 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
       originalUrl: originalUrl.trim() || (abTestingEnabled && variants[0]?.targetUrl ? variants[0].targetUrl.trim() : ''),
       customAlias: customAlias.trim() || undefined,
       expirationDays: expirationDays ? Number(expirationDays) : undefined,
+      maxClicks: maxClicks ? Number(maxClicks) : undefined,
+      fallbackUrl: fallbackUrl.trim() || undefined,
       password: password.trim() || undefined,
       previewEnabled: previewEnabled,
       iosUrl: iosUrl.trim() || undefined,
@@ -153,6 +158,8 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
       setOriginalUrl('');
       setCustomAlias('');
       setExpirationDays('');
+      setMaxClicks('');
+      setFallbackUrl('');
       setPassword('');
       setIosUrl('');
       setAndroidUrl('');
@@ -368,6 +375,57 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
                     className="text-xs h-9 bg-white"
                   />
                   <p className="text-[10px] text-zinc-400">{lang === 'tr' ? 'Yalnızca şifreyi bilenler açabilir' : 'Protect with access PIN'}</p>
+                </div>
+
+                {/* Max Clicks (Tıklama Sınırı / Click Cap) */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-zinc-700 flex items-center gap-1">
+                    <MousePointerClick className="w-3 h-3 text-zinc-400" />
+                    <span>{t.clickCapLabel || (lang === 'tr' ? 'Tıklama Sınırı' : 'Click Limit')}</span>
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      min="1"
+                      value={maxClicks}
+                      onChange={(e) => setMaxClicks(e.target.value ? parseInt(e.target.value) : '')}
+                      placeholder={lang === 'tr' ? 'Sınırsız' : 'Unlimited'}
+                      className="text-xs h-9 bg-white flex-1"
+                    />
+                    <div className="flex items-center gap-1 shrink-0">
+                      {[50, 100, 500].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setMaxClicks(preset)}
+                          className={`px-2 py-1.5 rounded-lg text-[10px] font-mono font-medium border transition-colors cursor-pointer ${
+                            maxClicks === preset
+                              ? 'bg-zinc-900 text-white border-zinc-900'
+                              : 'bg-white text-zinc-600 border-zinc-200/90 hover:bg-zinc-100'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-zinc-400">{lang === 'tr' ? 'Maksimum tıklama kotası' : 'Max click quota'}</p>
+                </div>
+
+                {/* Fallback URL (Yedek URL) */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-xs font-semibold text-zinc-700 flex items-center gap-1">
+                    <Globe className="w-3 h-3 text-zinc-400" />
+                    <span>{t.fallbackUrlLabel || (lang === 'tr' ? 'Yedek URL (Fallback)' : 'Fallback URL')}</span>
+                  </label>
+                  <Input
+                    type="url"
+                    value={fallbackUrl}
+                    onChange={(e) => setFallbackUrl(e.target.value)}
+                    placeholder="https://sirketim.com/kampanya-bitti"
+                    className="text-xs h-9 bg-white font-mono"
+                  />
+                  <p className="text-[10px] text-zinc-400">{lang === 'tr' ? 'Süre veya tıklama kotası dolduğunda yönlendirilecek sayfa' : 'Redirect when expired or click limit reached'}</p>
                 </div>
               </div>
 

@@ -16,6 +16,8 @@ public class UrlPreviewResponse {
     private Long createdAt;
     private Long expiresAt;
     private Long clickCount;
+    private Long maxClicks;
+    private String fallbackUrl;
     private boolean active;
     private String iosUrl;
     private String androidUrl;
@@ -98,6 +100,8 @@ public class UrlPreviewResponse {
         private Long createdAt;
         private Long expiresAt;
         private Long clickCount;
+        private Long maxClicks;
+        private String fallbackUrl;
         private boolean active;
         private String iosUrl;
         private String androidUrl;
@@ -124,6 +128,8 @@ public class UrlPreviewResponse {
         public Builder createdAt(Long createdAt) { this.createdAt = createdAt; return this; }
         public Builder expiresAt(Long expiresAt) { this.expiresAt = expiresAt; return this; }
         public Builder clickCount(Long clickCount) { this.clickCount = clickCount; return this; }
+        public Builder maxClicks(Long maxClicks) { this.maxClicks = maxClicks; return this; }
+        public Builder fallbackUrl(String fallbackUrl) { this.fallbackUrl = fallbackUrl; return this; }
         public Builder active(boolean active) { this.active = active; return this; }
         public Builder iosUrl(String iosUrl) { this.iosUrl = iosUrl; return this; }
         public Builder androidUrl(String androidUrl) { this.androidUrl = androidUrl; return this; }
@@ -136,10 +142,13 @@ public class UrlPreviewResponse {
         public Builder healthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; return this; }
 
         public UrlPreviewResponse build() {
-            return new UrlPreviewResponse(shortCode, shortUrl, originalUrl, domain, protocol, secure, safetyStatus,
+            UrlPreviewResponse resp = new UrlPreviewResponse(shortCode, shortUrl, originalUrl, domain, protocol, secure, safetyStatus,
                     safetyScore, googleSafeBrowsingStatus, virusTotalStatus, passwordProtected, previewEnabled,
                     createdAt, expiresAt, clickCount, active, iosUrl, androidUrl, desktopUrl, webhookUrl,
                     healthStatus, lastHealthCheck, healthStatusCode, healthErrorMessage, healthResponseTimeMs);
+            resp.setMaxClicks(maxClicks);
+            resp.setFallbackUrl(fallbackUrl);
+            return resp;
         }
     }
 
@@ -217,4 +226,10 @@ public class UrlPreviewResponse {
 
     public Long getHealthResponseTimeMs() { return healthResponseTimeMs; }
     public void setHealthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; }
+
+    public Long getMaxClicks() { return maxClicks; }
+    public void setMaxClicks(Long maxClicks) { this.maxClicks = maxClicks; }
+
+    public String getFallbackUrl() { return fallbackUrl; }
+    public void setFallbackUrl(String fallbackUrl) { this.fallbackUrl = fallbackUrl; }
 }

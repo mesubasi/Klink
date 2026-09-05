@@ -191,6 +191,7 @@ public class UrlShortenerService {
                 .expiresAt(expiresAt)
                 .fallbackUrl(fallbackUrl)
                 .clickCount(0L)
+                .maxClicks(request.getMaxClicks())
                 .active(true)
                 .passwordHash(passwordHash)
                 .blockedCountries(blockedCountries)
@@ -239,7 +240,7 @@ public class UrlShortenerService {
             }
         }
 
-        if (!mapping.isPasswordProtected() && !hasRestrictions && !hasDeviceTargeting && !abTestActive) {
+        if (!mapping.isPasswordProtected() && !hasRestrictions && !hasDeviceTargeting && !abTestActive && mapping.getMaxClicks() == null) {
             cacheUrl(shortCode, originalUrl);
         }
 
@@ -282,6 +283,15 @@ public class UrlShortenerService {
             throw new UrlNotFoundException(messageService.getMessage("url.expired"));
         }
 
+        if (mapping.getMaxClicks() != null && mapping.getClickCount() >= mapping.getMaxClicks()) {
+            if (mapping.getFallbackUrl() != null && !mapping.getFallbackUrl().trim().isEmpty()) {
+                log.info("Tıklama sınırı dolan link ({}) için yedek URL (fallback) devreye giriyor: {}", shortCode, mapping.getFallbackUrl());
+                publishClickEvent(shortCode, request);
+                return mapping.getFallbackUrl();
+            }
+            throw new UrlNotFoundException(messageService.getMessage("url.click_limit_reached"));
+        }
+
         String blockedFallback = checkAccessRestrictions(mapping, request);
         if (blockedFallback != null) {
             publishClickEvent(shortCode, request);
@@ -311,6 +321,15 @@ public class UrlShortenerService {
                 return mapping.getFallbackUrl();
             }
             throw new UrlNotFoundException(messageService.getMessage("url.expired"));
+        }
+
+        if (mapping.getMaxClicks() != null && mapping.getClickCount() >= mapping.getMaxClicks()) {
+            if (mapping.getFallbackUrl() != null && !mapping.getFallbackUrl().trim().isEmpty()) {
+                log.info("Tıklama sınırı dolan şifreli link ({}) için yedek URL (fallback) devreye giriyor: {}", shortCode, mapping.getFallbackUrl());
+                publishClickEvent(shortCode, request);
+                return mapping.getFallbackUrl();
+            }
+            throw new UrlNotFoundException(messageService.getMessage("url.click_limit_reached"));
         }
 
         String blockedFallback = checkAccessRestrictions(mapping, request);
@@ -770,6 +789,8 @@ public class UrlShortenerService {
                 .createdAt(mapping.getCreatedAt())
                 .expiresAt(mapping.getExpiresAt())
                 .clickCount(mapping.getClickCount())
+                .maxClicks(mapping.getMaxClicks())
+                .fallbackUrl(mapping.getFallbackUrl())
                 .active(mapping.isActive())
                 .iosUrl(mapping.getIosUrl())
                 .androidUrl(mapping.getAndroidUrl())
@@ -867,6 +888,8 @@ public class UrlShortenerService {
                 .createdAt(mapping.getCreatedAt())
                 .expiresAt(mapping.getExpiresAt())
                 .clickCount(mapping.getClickCount())
+                .maxClicks(mapping.getMaxClicks())
+                .fallbackUrl(mapping.getFallbackUrl())
                 .passwordProtected(mapping.isPasswordProtected())
                 .blockedCountries(mapping.getBlockedCountries())
                 .blockedIps(mapping.getBlockedIps())

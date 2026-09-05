@@ -34,6 +34,8 @@ public class UrlMapping implements Serializable {
     @Column(nullable = false)
     private Long clickCount = 0L;
 
+    private Long maxClicks;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -163,6 +165,7 @@ public class UrlMapping implements Serializable {
         private Long expiresAt;
         private String fallbackUrl;
         private Long clickCount = 0L;
+        private Long maxClicks;
         private boolean active = true;
         private String passwordHash;
         private String blockedCountries;
@@ -190,6 +193,7 @@ public class UrlMapping implements Serializable {
         public Builder expiresAt(Long expiresAt) { this.expiresAt = expiresAt; return this; }
         public Builder fallbackUrl(String fallbackUrl) { this.fallbackUrl = fallbackUrl; return this; }
         public Builder clickCount(Long clickCount) { this.clickCount = clickCount; return this; }
+        public Builder maxClicks(Long maxClicks) { this.maxClicks = maxClicks; return this; }
         public Builder active(boolean active) { this.active = active; return this; }
         public Builder passwordHash(String passwordHash) { this.passwordHash = passwordHash; return this; }
         public Builder blockedCountries(String blockedCountries) { this.blockedCountries = blockedCountries; return this; }
@@ -212,6 +216,7 @@ public class UrlMapping implements Serializable {
 
         public UrlMapping build() {
             UrlMapping mapping = new UrlMapping(id, originalUrl, shortCode, createdAt, expiresAt, fallbackUrl, clickCount, active, passwordHash, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, webhookSecret, healthStatus, lastHealthCheck, healthStatusCode, healthErrorMessage, healthResponseTimeMs, user);
+            mapping.setMaxClicks(maxClicks);
             mapping.setWorkspace(workspace);
             mapping.setAbTestingEnabled(abTestingEnabled);
             if (variants != null) {
@@ -278,4 +283,6 @@ public class UrlMapping implements Serializable {
     public void setUser(UserAccount user) { this.user = user; }
     public Workspace getWorkspace() { return workspace; }
     public void setWorkspace(Workspace workspace) { this.workspace = workspace; }
+    public Long getMaxClicks() { return maxClicks; }
+    public void setMaxClicks(Long maxClicks) { this.maxClicks = maxClicks; }
 }

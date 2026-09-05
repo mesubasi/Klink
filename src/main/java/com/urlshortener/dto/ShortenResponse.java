@@ -7,6 +7,8 @@ public class ShortenResponse {
     private Long createdAt;
     private Long expiresAt;
     private Long clickCount;
+    private Long maxClicks;
+    private String fallbackUrl;
     private boolean passwordProtected;
     private String blockedCountries;
     private String blockedIps;
@@ -78,6 +80,8 @@ public class ShortenResponse {
         private Long createdAt;
         private Long expiresAt;
         private Long clickCount;
+        private Long maxClicks;
+        private String fallbackUrl;
         private boolean passwordProtected;
         private String blockedCountries;
         private String blockedIps;
@@ -102,6 +106,8 @@ public class ShortenResponse {
         public Builder createdAt(Long createdAt) { this.createdAt = createdAt; return this; }
         public Builder expiresAt(Long expiresAt) { this.expiresAt = expiresAt; return this; }
         public Builder clickCount(Long clickCount) { this.clickCount = clickCount; return this; }
+        public Builder maxClicks(Long maxClicks) { this.maxClicks = maxClicks; return this; }
+        public Builder fallbackUrl(String fallbackUrl) { this.fallbackUrl = fallbackUrl; return this; }
         public Builder passwordProtected(boolean passwordProtected) { this.passwordProtected = passwordProtected; return this; }
         public Builder blockedCountries(String blockedCountries) { this.blockedCountries = blockedCountries; return this; }
         public Builder blockedIps(String blockedIps) { this.blockedIps = blockedIps; return this; }
@@ -122,6 +128,8 @@ public class ShortenResponse {
 
         public ShortenResponse build() {
             ShortenResponse resp = new ShortenResponse(shortCode, shortUrl, originalUrl, createdAt, expiresAt, clickCount, passwordProtected, blockedCountries, blockedIps, previewEnabled, iosUrl, androidUrl, desktopUrl, webhookUrl, healthStatus, lastHealthCheck, healthStatusCode, healthErrorMessage, healthResponseTimeMs);
+            resp.setMaxClicks(maxClicks);
+            resp.setFallbackUrl(fallbackUrl);
             resp.setWorkspaceId(workspaceId);
             resp.setWorkspaceName(workspaceName);
             resp.setAbTestingEnabled(abTestingEnabled);
@@ -176,4 +184,8 @@ public class ShortenResponse {
     public void setAbTestingEnabled(boolean abTestingEnabled) { this.abTestingEnabled = abTestingEnabled; }
     public java.util.List<UrlVariantResponse> getVariants() { return variants; }
     public void setVariants(java.util.List<UrlVariantResponse> variants) { this.variants = variants; }
+    public Long getMaxClicks() { return maxClicks; }
+    public void setMaxClicks(Long maxClicks) { this.maxClicks = maxClicks; }
+    public String getFallbackUrl() { return fallbackUrl; }
+    public void setFallbackUrl(String fallbackUrl) { this.fallbackUrl = fallbackUrl; }
 }

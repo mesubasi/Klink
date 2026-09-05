@@ -272,4 +272,33 @@ public class UrlControllerTest {
                 .andExpect(jsonPath("$.healthStatus").value("HEALTHY"))
                 .andExpect(jsonPath("$.healthStatusCode").value(200));
     }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    public void testShortenUrlWithMaxClicksAndFallback() throws Exception {
+        ShortenRequest request = new ShortenRequest();
+        request.setOriginalUrl("https://example.com/promo");
+        request.setMaxClicks(100L);
+        request.setFallbackUrl("https://example.com/fallback");
+
+        ShortenResponse response = ShortenResponse.builder()
+                .shortCode("promo100")
+                .shortUrl("http://localhost:8080/promo100")
+                .originalUrl("https://example.com/promo")
+                .maxClicks(100L)
+                .fallbackUrl("https://example.com/fallback")
+                .clickCount(0L)
+                .build();
+
+        given(urlShortenerService.shortenUrl(any(ShortenRequest.class))).willReturn(response);
+
+        mockMvc.perform(post("/api/v1/urls/shorten")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.shortCode").value("promo100"))
+                .andExpect(jsonPath("$.maxClicks").value(100))
+                .andExpect(jsonPath("$.fallbackUrl").value("https://example.com/fallback"));
+    }
 }

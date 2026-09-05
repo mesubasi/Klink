@@ -4,6 +4,8 @@ export interface ShortenRequest {
   expirationDays?: number;
   expiresAt?: number;
   password?: string;
+  fallbackUrl?: string;
+  maxClicks?: number;
   previewEnabled?: boolean;
   iosUrl?: string;
   androidUrl?: string;
@@ -22,6 +24,8 @@ export interface ShortenResponse {
   createdAt: number;
   expiresAt?: number;
   clickCount: number;
+  maxClicks?: number;
+  fallbackUrl?: string;
   passwordProtected: boolean;
   previewEnabled?: boolean;
   iosUrl?: string;
@@ -55,6 +59,8 @@ export interface UrlPreviewResponse {
   createdAt: number;
   expiresAt?: number;
   clickCount: number;
+  maxClicks?: number;
+  fallbackUrl?: string;
   active: boolean;
   iosUrl?: string;
   androidUrl?: string;

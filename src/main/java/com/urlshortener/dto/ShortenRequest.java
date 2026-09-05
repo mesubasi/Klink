@@ -22,6 +22,9 @@ public class ShortenRequest {
 
     private String fallbackUrl;
 
+    @Min(value = 1, message = "{validation.max_clicks.min}")
+    private Long maxClicks;
+
     private String blockedCountries;
 
     private String blockedIps;
@@ -136,4 +139,6 @@ public class ShortenRequest {
     public void setAbTestingEnabled(Boolean abTestingEnabled) { this.abTestingEnabled = abTestingEnabled; }
     public java.util.List<UrlVariantRequest> getVariants() { return variants; }
     public void setVariants(java.util.List<UrlVariantRequest> variants) { this.variants = variants; }
+    public Long getMaxClicks() { return maxClicks; }
+    public void setMaxClicks(Long maxClicks) { this.maxClicks = maxClicks; }
 }

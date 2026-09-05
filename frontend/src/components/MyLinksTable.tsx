@@ -24,7 +24,8 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Split
+  Split,
+  MousePointerClick
 } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
 import { ShortenResponse } from '@/lib/types';
@@ -339,13 +340,28 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                     <TableCell>
                       <div className="space-y-1 w-24">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-mono font-bold text-zinc-950">{link.clickCount}</span>
-                          <span className="text-[10px] text-zinc-400">tık</span>
+                          <span className={`font-mono font-bold ${link.maxClicks && (link.clickCount || 0) >= link.maxClicks ? 'text-red-600' : 'text-zinc-950'}`}>
+                            {link.clickCount}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 font-mono">
+                            {link.maxClicks ? `/ ${link.maxClicks}` : 'tık'}
+                          </span>
                         </div>
                         <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-zinc-900 rounded-full"
-                            style={{ width: `${Math.max(8, clickPercent)}%` }}
+                            className={`h-full rounded-full transition-all ${
+                              link.maxClicks && (link.clickCount || 0) >= link.maxClicks
+                                ? 'bg-red-500'
+                                : 'bg-zinc-900'
+                            }`}
+                            style={{
+                              width: `${Math.max(
+                                8,
+                                link.maxClicks
+                                  ? Math.min(100, Math.round(((link.clickCount || 0) / link.maxClicks) * 100))
+                                  : clickPercent
+                              )}%`
+                            }}
                           />
                         </div>
                       </div>
@@ -354,7 +370,12 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                     {/* Status Badges */}
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {link.passwordProtected ? (
+                        {link.maxClicks && (link.clickCount || 0) >= link.maxClicks ? (
+                          <Badge variant="destructive" className="text-[10px] gap-1 animate-pulse" title={`Tıklama Kotası Doldu (${link.clickCount}/${link.maxClicks})`}>
+                            <MousePointerClick className="w-2.5 h-2.5" />
+                            <span>{t.statusLimitReached || (lang === 'tr' ? 'Limit Doldu' : 'Limit Reached')}</span>
+                          </Badge>
+                        ) : link.passwordProtected ? (
                           <Badge variant="warning" className="text-[10px] gap-1">
                             <Lock className="w-2.5 h-2.5" />
                             {t.statusProtected}
@@ -363,6 +384,20 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                           <Badge variant="success" className="text-[10px] gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                             {t.statusActive}
+                          </Badge>
+                        )}
+
+                        {link.maxClicks && (link.clickCount || 0) < link.maxClicks && (
+                          <Badge variant="outline" className="text-[10px] text-amber-800 bg-amber-50/70 border-amber-300 font-mono" title={`Maksimum ${link.maxClicks} tıklama kotası`}>
+                            <MousePointerClick className="w-2.5 h-2.5 mr-0.5 text-amber-600" />
+                            <span>{link.clickCount}/{link.maxClicks}</span>
+                          </Badge>
+                        )}
+
+                        {link.fallbackUrl && (
+                          <Badge variant="outline" className="text-[10px] text-blue-800 bg-blue-50/70 border-blue-200" title={`Yedek URL: ${link.fallbackUrl}`}>
+                            <Globe className="w-2.5 h-2.5 mr-0.5 text-blue-600" />
+                            <span>{lang === 'tr' ? 'Yedekli' : 'Fallback'}</span>
                           </Badge>
                         )}
 
