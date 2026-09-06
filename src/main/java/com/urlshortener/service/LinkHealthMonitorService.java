@@ -28,11 +28,15 @@ public class LinkHealthMonitorService {
 
     private final UrlMappingRepository urlMappingRepository;
     private final MessageService messageService;
+    private final EmailService emailService;
     private final HttpClient httpClient;
 
-    public LinkHealthMonitorService(UrlMappingRepository urlMappingRepository, MessageService messageService) {
+    public LinkHealthMonitorService(UrlMappingRepository urlMappingRepository,
+                                    MessageService messageService,
+                                    EmailService emailService) {
         this.urlMappingRepository = urlMappingRepository;
         this.messageService = messageService;
+        this.emailService = emailService;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(6))
                 .followRedirects(HttpClient.Redirect.NEVER)
@@ -49,6 +53,7 @@ public class LinkHealthMonitorService {
         }
 
         String targetUrl = mapping.getOriginalUrl().trim();
+        String oldStatus = mapping.getHealthStatus();
         long startTime = System.currentTimeMillis();
         String healthStatus;
         Integer statusCode = null;
@@ -63,7 +68,11 @@ public class LinkHealthMonitorService {
             mapping.setHealthStatusCode(0);
             mapping.setHealthErrorMessage("Güvenlik Engeli: Yerel/Özel ağ adresleri (SSRF) taranamaz");
             mapping.setHealthResponseTimeMs(0L);
-            return urlMappingRepository.save(mapping);
+            UrlMapping saved = urlMappingRepository.save(mapping);
+            if (!"BROKEN".equals(oldStatus)) {
+                emailService.sendBrokenLinkAlert(saved);
+            }
+            return saved;
         }
 
         try {
@@ -150,7 +159,14 @@ public class LinkHealthMonitorService {
         mapping.setHealthErrorMessage(errorMessage);
         mapping.setHealthResponseTimeMs(duration);
 
-        return urlMappingRepository.save(mapping);
+        UrlMapping saved = urlMappingRepository.save(mapping);
+
+        // Durum geçişi kontrolü: Yalnızca link ilk çöktüğü an (HEALTHY/UNKNOWN/DEGRADED -> BROKEN) uyarı gönder
+        if ("BROKEN".equals(healthStatus) && !"BROKEN".equals(oldStatus)) {
+            emailService.sendBrokenLinkAlert(saved);
+        }
+
+        return saved;
     }
 
     /**

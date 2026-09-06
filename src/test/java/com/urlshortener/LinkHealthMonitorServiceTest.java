@@ -25,11 +25,14 @@ public class LinkHealthMonitorServiceTest {
     @Mock
     private MessageService messageService;
 
+    @Mock
+    private com.urlshortener.service.EmailService emailService;
+
     private LinkHealthMonitorService linkHealthMonitorService;
 
     @BeforeEach
     public void setup() {
-        linkHealthMonitorService = new LinkHealthMonitorService(urlMappingRepository, messageService);
+        linkHealthMonitorService = new LinkHealthMonitorService(urlMappingRepository, messageService, emailService);
     }
 
     @Test
@@ -64,5 +67,38 @@ public class LinkHealthMonitorServiceTest {
 
         assertNotNull(result);
         assertEquals("BROKEN", result.getHealthStatus());
+    }
+
+    @Test
+    public void testEmailAlertFiredOnTransitionToBroken() {
+        UrlMapping mapping = UrlMapping.builder()
+                .shortCode("alertTest")
+                .originalUrl("https://this-domain-definitely-does-not-exist-xyz987654.com")
+                .healthStatus("HEALTHY")
+                .build();
+
+        given(urlMappingRepository.save(any(UrlMapping.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        linkHealthMonitorService.checkUrlHealth(mapping);
+
+        org.mockito.Mockito.verify(emailService, org.mockito.Mockito.times(1))
+                .sendBrokenLinkAlert(any(UrlMapping.class));
+    }
+
+    @Test
+    public void testEmailAlertNotFiredIfAlreadyBroken() {
+        UrlMapping mapping = UrlMapping.builder()
+                .shortCode("alreadyBroken")
+                .originalUrl("https://this-domain-definitely-does-not-exist-xyz987654.com")
+                .healthStatus("BROKEN")
+                .build();
+
+        given(urlMappingRepository.save(any(UrlMapping.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        linkHealthMonitorService.checkUrlHealth(mapping);
+
+        // Link zaten BROKEN olduğu için tekrar mail ATILMAMALI (Spam engeli)
+        org.mockito.Mockito.verify(emailService, org.mockito.Mockito.never())
+                .sendBrokenLinkAlert(any(UrlMapping.class));
     }
 }
