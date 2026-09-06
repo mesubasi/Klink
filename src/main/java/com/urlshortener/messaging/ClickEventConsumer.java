@@ -2,6 +2,7 @@ package com.urlshortener.messaging;
 
 import com.urlshortener.dto.ClickEventDto;
 import com.urlshortener.model.ClickAnalytics;
+import com.urlshortener.model.UrlMapping;
 import com.urlshortener.repository.ClickAnalyticsRepository;
 import com.urlshortener.repository.UrlMappingRepository;
 import com.urlshortener.service.WebhookDispatcherService;
@@ -19,13 +20,16 @@ public class ClickEventConsumer {
     private final ClickAnalyticsRepository clickAnalyticsRepository;
     private final UrlMappingRepository urlMappingRepository;
     private final WebhookDispatcherService webhookDispatcherService;
+    private final com.urlshortener.service.LiveClickStreamService liveClickStreamService;
 
     public ClickEventConsumer(ClickAnalyticsRepository clickAnalyticsRepository,
                               UrlMappingRepository urlMappingRepository,
-                              WebhookDispatcherService webhookDispatcherService) {
+                              WebhookDispatcherService webhookDispatcherService,
+                              com.urlshortener.service.LiveClickStreamService liveClickStreamService) {
         this.clickAnalyticsRepository = clickAnalyticsRepository;
         this.urlMappingRepository = urlMappingRepository;
         this.webhookDispatcherService = webhookDispatcherService;
+        this.liveClickStreamService = liveClickStreamService;
     }
 
     @RabbitListener(queues = "${app.rabbitmq.queue:url.click.queue}")
@@ -62,6 +66,12 @@ public class ClickEventConsumer {
 
             // Webhook gönderimini asenkron tetikle
             webhookDispatcherService.dispatchClickWebhook(clickEvent);
+
+            // Canlı Ziyaret Akışı (SSE) abonelerine yayınla
+            UrlMapping mapping = urlMappingRepository.findByShortCode(clickEvent.getShortCode()).orElse(null);
+            if (mapping != null) {
+                liveClickStreamService.broadcastClick(clickEvent, mapping);
+            }
         } catch (Exception e) {
             log.error("Tıklama olayı işlenirken veritabanı hatası: {}", e.getMessage(), e);
         }

@@ -373,5 +373,24 @@ export interface UpdateAbTestConfigRequest {
   variants: UrlVariantRequest[];
 }
 
+export interface LiveClickDto {
+  shortCode: string;
+  originalUrl: string;
+  clickedAt: number;
+  country: string;
+  countryCode: string;
+  city: string;
+  maskedIp: string;
+  userAgent?: string;
+  deviceType: string;
+  browser: string;
+  os: string;
+  referrer: string;
+  bot: boolean;
+  botCategory?: string;
+  variantId?: string;
+  variantLabel?: string;
+}
+
 
 

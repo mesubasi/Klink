@@ -77,6 +77,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/urls/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/v1/workspaces/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/v1/auth/me", "/api/v1/auth/2fa/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/v1/telemetry/**").hasAnyRole("USER", "ADMIN")
                 
                 .anyRequest().authenticated()
             )

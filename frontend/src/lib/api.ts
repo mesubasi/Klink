@@ -31,7 +31,8 @@ import {
   WorkspacePermissionMatrixResponse,
   UpdatePermissionMatrixRequest,
   AbTestConfigResponse,
-  UpdateAbTestConfigRequest
+  UpdateAbTestConfigRequest,
+  LiveClickDto
 } from './types';
 
 const getApiBaseUrl = (): string => {
@@ -1065,6 +1066,32 @@ export class ApiClient {
       throw new Error(errorData?.message || 'A/B testi ayarları güncellenemedi.');
     }
 
+    return await res.json();
+  }
+
+  // 39. Telemetri & Canlı Akış Metodları
+  static getTelemetryStreamUrl(token?: string, shortCode?: string): string {
+    const base = getApiBaseUrl();
+    const params = new URLSearchParams();
+    if (token) params.set('token', token);
+    if (shortCode) params.set('shortCode', shortCode);
+    const queryString = params.toString();
+    return `${base}/telemetry/stream${queryString ? '?' + queryString : ''}`;
+  }
+
+  static async getRecentClicks(
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string },
+    shortCode?: string
+  ): Promise<LiveClickDto[]> {
+    const query = shortCode ? `?shortCode=${encodeURIComponent(shortCode)}` : '';
+    const res = await this.safeFetch(`${API_BASE_URL}/telemetry/recent${query}`, {
+      method: 'GET',
+      headers: this.getHeaders(lang, authUser),
+    });
+    if (!res || !res.ok) {
+      return [];
+    }
     return await res.json();
   }
 }

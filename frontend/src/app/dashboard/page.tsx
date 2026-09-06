@@ -16,7 +16,8 @@ import {
   ExternalLink,
   Sparkles,
   KeyRound,
-  Building2
+  Building2,
+  Radio
 } from 'lucide-react';
 import Link from 'next/link';
 import { Navbar } from '@/components/Navbar';
@@ -26,6 +27,7 @@ import { BulkShortenerWidget } from '@/components/BulkShortenerWidget';
 import { BioPageEditor } from '@/components/BioPageEditor';
 import { DeveloperApiWidget } from '@/components/DeveloperApiWidget';
 import { WorkspaceManagerWidget } from '@/components/WorkspaceManagerWidget';
+import { LiveClickStreamWidget } from '@/components/LiveClickStreamWidget';
 import { QrCodeModal } from '@/components/QrCodeModal';
 import { AnalyticsModal } from '@/components/AnalyticsModal';
 import { PasswordVerifyModal } from '@/components/PasswordVerifyModal';
@@ -40,7 +42,7 @@ import { Badge } from '@/components/ui/badge';
 
 export default function UserDashboardPage() {
   const [lang, setLang] = useState<Language>('tr');
-  const [activeTab, setActiveTab] = useState<'overview' | 'vault' | 'bulk' | 'bio' | 'workspaces' | 'api'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'vault' | 'live' | 'bulk' | 'bio' | 'workspaces' | 'api'>('overview');
   const [authUser, setAuthUser] = useState<{ u: string; p: string; token?: string; role?: string } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -308,10 +310,10 @@ export default function UserDashboardPage() {
         {/* Segmented Navigation Tabs */}
         <Tabs
           value={activeTab}
-          onValueChange={(val) => setActiveTab(val as 'overview' | 'vault' | 'bulk' | 'bio' | 'workspaces' | 'api')}
+          onValueChange={(val) => setActiveTab(val as 'overview' | 'vault' | 'live' | 'bulk' | 'bio' | 'workspaces' | 'api')}
           className="space-y-6"
         >
-          <TabsList className="grid w-full max-w-3xl grid-cols-3 sm:grid-cols-6 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-800">
+          <TabsList className="grid w-full max-w-4xl grid-cols-3 sm:grid-cols-7 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-800">
             <TabsTrigger value="overview" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-white">
               <LayoutDashboard className="w-3.5 h-3.5" />
               <span>{t.tabOverview}</span>
@@ -319,6 +321,10 @@ export default function UserDashboardPage() {
             <TabsTrigger value="vault" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-white">
               <Link2 className="w-3.5 h-3.5" />
               <span>{t.tabMyLinks}</span>
+            </TabsTrigger>
+            <TabsTrigger value="live" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span>{lang === 'tr' ? '📡 Canlı Akış' : '📡 Live'}</span>
             </TabsTrigger>
             <TabsTrigger value="bulk" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-white">
               <Layers className="w-3.5 h-3.5" />
@@ -346,6 +352,14 @@ export default function UserDashboardPage() {
               onSuccess={handleShortenSuccess}
               onOpenQr={(shortCode) => setQrCodeModal(shortCode)}
             />
+            
+            {/* Live Click Stream Overview Widget */}
+            <LiveClickStreamWidget
+              lang={lang}
+              authUser={authUser}
+              compact={true}
+            />
+
             <MyLinksTable
               lang={lang}
               links={links}
@@ -371,6 +385,15 @@ export default function UserDashboardPage() {
               onOpenAnalyticsModal={(shortCode) => setAnalyticsModal(shortCode)}
               onDeleteLink={handleDeleteLink}
               onLinkUpdated={handleLinkUpdated}
+            />
+          </TabsContent>
+
+          {/* Tab: Dedicated Live Click Stream */}
+          <TabsContent value="live">
+            <LiveClickStreamWidget
+              lang={lang}
+              authUser={authUser}
+              compact={false}
             />
           </TabsContent>
 

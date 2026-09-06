@@ -31,11 +31,12 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { LiveClickStreamWidget } from '@/components/LiveClickStreamWidget';
 
 interface AnalyticsModalProps {
   shortCode: string | null;
   lang: Language;
-  authUser: { u: string; p: string };
+  authUser: { u: string; p: string; token?: string; role?: string } | null;
   onClose: () => void;
 }
 
@@ -61,8 +62,8 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
     setLoading(true);
     setEmailSentMessage('');
     Promise.all([
-      ApiClient.getAnalyticsSummary(shortCode, lang, authUser),
-      ApiClient.getAbTestConfig(shortCode, lang, authUser)
+      ApiClient.getAnalyticsSummary(shortCode, lang, authUser || undefined),
+      ApiClient.getAbTestConfig(shortCode, lang, authUser || undefined)
     ])
       .then(([analyticsRes, abRes]) => {
         setData(analyticsRes);
@@ -85,7 +86,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
     setEmailSending(true);
     setEmailSentMessage('');
     try {
-      const res = await ApiClient.sendEmailReport(shortCode, undefined, lang, authUser);
+      const res = await ApiClient.sendEmailReport(shortCode, undefined, lang, authUser || undefined);
       setEmailSentMessage(res.message || (lang === 'tr' ? 'Haftalık rapor e-posta adresinize gönderildi!' : 'Weekly report sent to your email!'));
       setTimeout(() => setEmailSentMessage(''), 5000);
     } catch (e: any) {
@@ -204,6 +205,14 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                 <span>Canlı Teleometri</span>
               </div>
             </div>
+
+            {/* Link-Specific Live Click Stream */}
+            <LiveClickStreamWidget
+              lang={lang}
+              authUser={authUser}
+              filterShortCode={shortCode || undefined}
+              compact={true}
+            />
 
             {/* A/B Split Test Performance Comparison Card */}
             {abTestConfig && abTestConfig.abTestingEnabled && abTestConfig.variants && abTestConfig.variants.length > 0 && (
