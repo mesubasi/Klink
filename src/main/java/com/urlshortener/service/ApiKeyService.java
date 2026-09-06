@@ -148,10 +148,14 @@ public class ApiKeyService {
     @Transactional
     public ApiKeyResponse regenerateApiKey(UUID keyId) {
         UserAccount user = getCurrentUser();
+        if (user == null) {
+            throw new SecurityException("Bu işlem için oturum açmanız gerekmektedir.");
+        }
+
         ApiKey apiKey = apiKeyRepository.findById(keyId)
                 .orElseThrow(() -> new IllegalArgumentException("API anahtarı bulunamadı: " + keyId));
 
-        if (user != null && !user.getId().equals(apiKey.getUser().getId()) && !"ROLE_ADMIN".equals(user.getRole())) {
+        if (!user.getId().equals(apiKey.getUser().getId()) && !"ROLE_ADMIN".equals(user.getRole())) {
             throw new SecurityException("Bu işlem için yetkiniz yok.");
         }
 

@@ -58,7 +58,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public Yönlendirme, Önizleme ve Link-in-Bio Endpoint'leri
                 .requestMatchers(HttpMethod.GET, "/{shortCode:[a-zA-Z0-9_-]{3,20}}", "/{shortCode:[a-zA-Z0-9_-]{3,20}}+", "/preview/**", "/bio/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/urls/*/preview", "/api/v1/urls/*/qrcode", "/api/v1/urls/analytics/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/urls/*/preview", "/api/v1/urls/*/qrcode").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/bio/{username:[a-zA-Z0-9_-]+}").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/bio/{username:[a-zA-Z0-9_-]+}/view", "/api/v1/bio/link/*/click").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/urls/shorten", "/api/v1/urls/bulk-shorten", "/api/v1/urls/*/proceed", "/api/v1/urls/*/verify-password", "/api/v1/urls/qrcode/**").permitAll()

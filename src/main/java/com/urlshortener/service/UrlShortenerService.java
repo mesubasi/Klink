@@ -152,6 +152,9 @@ public class UrlShortenerService {
         String androidUrl = (request.getAndroidUrl() != null && !request.getAndroidUrl().trim().isEmpty()) ? sanitizeUrl(request.getAndroidUrl().trim()) : null;
         String desktopUrl = (request.getDesktopUrl() != null && !request.getDesktopUrl().trim().isEmpty()) ? sanitizeUrl(request.getDesktopUrl().trim()) : null;
         String webhookUrl = (request.getWebhookUrl() != null && !request.getWebhookUrl().trim().isEmpty()) ? sanitizeUrl(request.getWebhookUrl().trim()) : null;
+        if (webhookUrl != null) {
+            urlSecurityScannerService.checkUrlSafety(webhookUrl);
+        }
         String webhookSecret = (request.getWebhookSecret() != null && !request.getWebhookSecret().trim().isEmpty()) ? request.getWebhookSecret().trim() : null;
 
         UserAccount currentUser = getCurrentAuthenticatedUser();
@@ -659,8 +662,8 @@ public class UrlShortenerService {
 
     private void checkOwnershipOrAdmin(UrlMapping mapping) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            return;
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            throw new IllegalArgumentException(messageService.getMessage("user.no_permission"));
         }
 
         boolean isSystemAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
@@ -773,11 +776,14 @@ public class UrlShortenerService {
             safetyScore = 15;
         }
 
+        String previewUrl = mapping.isPasswordProtected() ? "" : originalUrl;
+        String previewDomain = mapping.isPasswordProtected() ? "Korumalı Bağlantı" : domainName;
+
         return UrlPreviewResponse.builder()
                 .shortCode(mapping.getShortCode())
                 .shortUrl(domain + "/" + mapping.getShortCode())
-                .originalUrl(originalUrl)
-                .domain(domainName)
+                .originalUrl(previewUrl)
+                .domain(previewDomain)
                 .protocol(protocol)
                 .secure(isSecure)
                 .safetyStatus(safetyStatus)

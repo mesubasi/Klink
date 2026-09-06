@@ -51,6 +51,11 @@ public class WebhookDispatcherService {
 
             String webhookUrl = mapping.getWebhookUrl().trim();
 
+            if (!com.urlshortener.util.SecurityUtils.isPubliclyAccessibleUrl(webhookUrl)) {
+                log.warn("🚨 [Webhook SSRF Engeli] Özel veya yerel ağ adresi tespit edildi, istek iptal edildi: {}", webhookUrl);
+                return;
+            }
+
             Map<String, Object> payload = new HashMap<>();
             payload.put("event", "link.clicked");
             payload.put("shortCode", mapping.getShortCode());
