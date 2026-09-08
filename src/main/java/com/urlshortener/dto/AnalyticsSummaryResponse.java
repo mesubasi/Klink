@@ -16,10 +16,17 @@ public class AnalyticsSummaryResponse {
     private Map<String, Long> clicksByCity;
     private Map<String, Long> clicksByBotCategory;
     private int[][] hourlyHeatmap;
+    private Map<String, Long> clicksByUtmSource;
+    private Map<String, Long> clicksByUtmCampaign;
+    private Map<String, Long> clicksByUtmMedium;
 
     public AnalyticsSummaryResponse() {}
 
     public AnalyticsSummaryResponse(String shortCode, String originalUrl, Long totalClicks, Long humanClicks, Long botClicks, Map<String, Long> clicksByDevice, Map<String, Long> clicksByReferrer, Map<String, Long> clicksByDate, Map<String, Long> clicksByCountry, Map<String, Long> clicksByCity, Map<String, Long> clicksByBotCategory, int[][] hourlyHeatmap) {
+        this(shortCode, originalUrl, totalClicks, humanClicks, botClicks, clicksByDevice, clicksByReferrer, clicksByDate, clicksByCountry, clicksByCity, clicksByBotCategory, hourlyHeatmap, null, null, null);
+    }
+
+    public AnalyticsSummaryResponse(String shortCode, String originalUrl, Long totalClicks, Long humanClicks, Long botClicks, Map<String, Long> clicksByDevice, Map<String, Long> clicksByReferrer, Map<String, Long> clicksByDate, Map<String, Long> clicksByCountry, Map<String, Long> clicksByCity, Map<String, Long> clicksByBotCategory, int[][] hourlyHeatmap, Map<String, Long> clicksByUtmSource, Map<String, Long> clicksByUtmCampaign, Map<String, Long> clicksByUtmMedium) {
         this.shortCode = shortCode;
         this.originalUrl = originalUrl;
         this.totalClicks = totalClicks;
@@ -32,6 +39,9 @@ public class AnalyticsSummaryResponse {
         this.clicksByCity = clicksByCity;
         this.clicksByBotCategory = clicksByBotCategory;
         this.hourlyHeatmap = hourlyHeatmap;
+        this.clicksByUtmSource = clicksByUtmSource;
+        this.clicksByUtmCampaign = clicksByUtmCampaign;
+        this.clicksByUtmMedium = clicksByUtmMedium;
     }
 
     public static Builder builder() {
@@ -51,6 +61,9 @@ public class AnalyticsSummaryResponse {
         private Map<String, Long> clicksByCity;
         private Map<String, Long> clicksByBotCategory;
         private int[][] hourlyHeatmap;
+        private Map<String, Long> clicksByUtmSource;
+        private Map<String, Long> clicksByUtmCampaign;
+        private Map<String, Long> clicksByUtmMedium;
 
         public Builder shortCode(String shortCode) { this.shortCode = shortCode; return this; }
         public Builder originalUrl(String originalUrl) { this.originalUrl = originalUrl; return this; }
@@ -64,9 +77,12 @@ public class AnalyticsSummaryResponse {
         public Builder clicksByCity(Map<String, Long> clicksByCity) { this.clicksByCity = clicksByCity; return this; }
         public Builder clicksByBotCategory(Map<String, Long> clicksByBotCategory) { this.clicksByBotCategory = clicksByBotCategory; return this; }
         public Builder hourlyHeatmap(int[][] hourlyHeatmap) { this.hourlyHeatmap = hourlyHeatmap; return this; }
+        public Builder clicksByUtmSource(Map<String, Long> clicksByUtmSource) { this.clicksByUtmSource = clicksByUtmSource; return this; }
+        public Builder clicksByUtmCampaign(Map<String, Long> clicksByUtmCampaign) { this.clicksByUtmCampaign = clicksByUtmCampaign; return this; }
+        public Builder clicksByUtmMedium(Map<String, Long> clicksByUtmMedium) { this.clicksByUtmMedium = clicksByUtmMedium; return this; }
 
         public AnalyticsSummaryResponse build() {
-            return new AnalyticsSummaryResponse(shortCode, originalUrl, totalClicks, humanClicks, botClicks, clicksByDevice, clicksByReferrer, clicksByDate, clicksByCountry, clicksByCity, clicksByBotCategory, hourlyHeatmap);
+            return new AnalyticsSummaryResponse(shortCode, originalUrl, totalClicks, humanClicks, botClicks, clicksByDevice, clicksByReferrer, clicksByDate, clicksByCountry, clicksByCity, clicksByBotCategory, hourlyHeatmap, clicksByUtmSource, clicksByUtmCampaign, clicksByUtmMedium);
         }
     }
 
@@ -94,5 +110,11 @@ public class AnalyticsSummaryResponse {
     public void setClicksByBotCategory(Map<String, Long> clicksByBotCategory) { this.clicksByBotCategory = clicksByBotCategory; }
     public int[][] getHourlyHeatmap() { return hourlyHeatmap; }
     public void setHourlyHeatmap(int[][] hourlyHeatmap) { this.hourlyHeatmap = hourlyHeatmap; }
+    public Map<String, Long> getClicksByUtmSource() { return clicksByUtmSource; }
+    public void setClicksByUtmSource(Map<String, Long> clicksByUtmSource) { this.clicksByUtmSource = clicksByUtmSource; }
+    public Map<String, Long> getClicksByUtmCampaign() { return clicksByUtmCampaign; }
+    public void setClicksByUtmCampaign(Map<String, Long> clicksByUtmCampaign) { this.clicksByUtmCampaign = clicksByUtmCampaign; }
+    public Map<String, Long> getClicksByUtmMedium() { return clicksByUtmMedium; }
+    public void setClicksByUtmMedium(Map<String, Long> clicksByUtmMedium) { this.clicksByUtmMedium = clicksByUtmMedium; }
 }
 

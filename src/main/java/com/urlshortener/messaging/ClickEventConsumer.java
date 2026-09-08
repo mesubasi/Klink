@@ -52,6 +52,11 @@ public class ClickEventConsumer {
                     .botCategory(clickEvent.getBotCategory())
                     .variantId(clickEvent.getVariantId())
                     .variantLabel(clickEvent.getVariantLabel())
+                    .utmSource(clickEvent.getUtmSource())
+                    .utmMedium(clickEvent.getUtmMedium())
+                    .utmCampaign(clickEvent.getUtmCampaign())
+                    .utmTerm(clickEvent.getUtmTerm())
+                    .utmContent(clickEvent.getUtmContent())
                     .build();
 
             clickAnalyticsRepository.save(analytics);

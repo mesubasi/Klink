@@ -280,7 +280,7 @@ public class UrlShortenerService {
         if (mapping.getExpiresAt() != null && mapping.getExpiresAt() < System.currentTimeMillis()) {
             if (mapping.getFallbackUrl() != null && !mapping.getFallbackUrl().trim().isEmpty()) {
                 log.info("Süresi dolan link ({}) için yedek URL (fallback) devreye giriyor: {}", shortCode, mapping.getFallbackUrl());
-                publishClickEvent(shortCode, request);
+                publishClickEvent(shortCode, request, mapping);
                 return mapping.getFallbackUrl();
             }
             throw new UrlNotFoundException(messageService.getMessage("url.expired"));
@@ -289,7 +289,7 @@ public class UrlShortenerService {
         if (mapping.getMaxClicks() != null && mapping.getClickCount() >= mapping.getMaxClicks()) {
             if (mapping.getFallbackUrl() != null && !mapping.getFallbackUrl().trim().isEmpty()) {
                 log.info("Tıklama sınırı dolan link ({}) için yedek URL (fallback) devreye giriyor: {}", shortCode, mapping.getFallbackUrl());
-                publishClickEvent(shortCode, request);
+                publishClickEvent(shortCode, request, mapping);
                 return mapping.getFallbackUrl();
             }
             throw new UrlNotFoundException(messageService.getMessage("url.click_limit_reached"));
@@ -297,7 +297,7 @@ public class UrlShortenerService {
 
         String blockedFallback = checkAccessRestrictions(mapping, request);
         if (blockedFallback != null) {
-            publishClickEvent(shortCode, request);
+            publishClickEvent(shortCode, request, mapping);
             return blockedFallback;
         }
 
@@ -305,7 +305,7 @@ public class UrlShortenerService {
             throw new IllegalArgumentException(messageService.getMessage("url.password_protected"));
         }
 
-        publishClickEvent(shortCode, request);
+        publishClickEvent(shortCode, request, mapping);
         return resolveTargetByDevice(mapping, request);
     }
 
@@ -320,7 +320,7 @@ public class UrlShortenerService {
         if (mapping.getExpiresAt() != null && mapping.getExpiresAt() < System.currentTimeMillis()) {
             if (mapping.getFallbackUrl() != null && !mapping.getFallbackUrl().trim().isEmpty()) {
                 log.info("Süresi dolan şifreli link ({}) için yedek URL (fallback) devreye giriyor: {}", shortCode, mapping.getFallbackUrl());
-                publishClickEvent(shortCode, request);
+                publishClickEvent(shortCode, request, mapping);
                 return mapping.getFallbackUrl();
             }
             throw new UrlNotFoundException(messageService.getMessage("url.expired"));
@@ -329,7 +329,7 @@ public class UrlShortenerService {
         if (mapping.getMaxClicks() != null && mapping.getClickCount() >= mapping.getMaxClicks()) {
             if (mapping.getFallbackUrl() != null && !mapping.getFallbackUrl().trim().isEmpty()) {
                 log.info("Tıklama sınırı dolan şifreli link ({}) için yedek URL (fallback) devreye giriyor: {}", shortCode, mapping.getFallbackUrl());
-                publishClickEvent(shortCode, request);
+                publishClickEvent(shortCode, request, mapping);
                 return mapping.getFallbackUrl();
             }
             throw new UrlNotFoundException(messageService.getMessage("url.click_limit_reached"));
@@ -337,12 +337,12 @@ public class UrlShortenerService {
 
         String blockedFallback = checkAccessRestrictions(mapping, request);
         if (blockedFallback != null) {
-            publishClickEvent(shortCode, request);
+            publishClickEvent(shortCode, request, mapping);
             return blockedFallback;
         }
 
         if (!mapping.isPasswordProtected()) {
-            publishClickEvent(shortCode, request);
+            publishClickEvent(shortCode, request, mapping);
             return resolveTargetByDevice(mapping, request);
         }
 
@@ -377,7 +377,7 @@ public class UrlShortenerService {
             redisTemplate.delete(rateKey);
         } catch (Exception ignored) {}
 
-        publishClickEvent(shortCode, request);
+        publishClickEvent(shortCode, request, mapping);
         return resolveTargetByDevice(mapping, request);
     }
 
@@ -416,6 +416,9 @@ public class UrlShortenerService {
         Map<String, Long> clicksByCountry = new HashMap<>();
         Map<String, Long> clicksByCity = new HashMap<>();
         Map<String, Long> clicksByBotCategory = new HashMap<>();
+        Map<String, Long> clicksByUtmSource = new HashMap<>();
+        Map<String, Long> clicksByUtmCampaign = new HashMap<>();
+        Map<String, Long> clicksByUtmMedium = new HashMap<>();
         int[][] hourlyHeatmap = new int[7][24]; // 0=Monday..6=Sunday, 0..23 hours
 
         long humanClickCount = 0;
@@ -462,6 +465,21 @@ public class UrlShortenerService {
 
             String city = analytics.getCity() != null ? analytics.getCity() : "İstanbul";
             clicksByCity.put(city, clicksByCity.getOrDefault(city, 0L) + 1);
+
+            if (analytics.getUtmSource() != null && !analytics.getUtmSource().trim().isEmpty()) {
+                String source = analytics.getUtmSource().trim();
+                clicksByUtmSource.put(source, clicksByUtmSource.getOrDefault(source, 0L) + 1);
+            }
+
+            if (analytics.getUtmCampaign() != null && !analytics.getUtmCampaign().trim().isEmpty()) {
+                String campaign = analytics.getUtmCampaign().trim();
+                clicksByUtmCampaign.put(campaign, clicksByUtmCampaign.getOrDefault(campaign, 0L) + 1);
+            }
+
+            if (analytics.getUtmMedium() != null && !analytics.getUtmMedium().trim().isEmpty()) {
+                String medium = analytics.getUtmMedium().trim();
+                clicksByUtmMedium.put(medium, clicksByUtmMedium.getOrDefault(medium, 0L) + 1);
+            }
         }
 
         if (clicksByCountry.isEmpty()) {
@@ -483,6 +501,9 @@ public class UrlShortenerService {
                 .clicksByCountry(clicksByCountry)
                 .clicksByCity(clicksByCity)
                 .clicksByBotCategory(clicksByBotCategory)
+                .clicksByUtmSource(clicksByUtmSource)
+                .clicksByUtmCampaign(clicksByUtmCampaign)
+                .clicksByUtmMedium(clicksByUtmMedium)
                 .hourlyHeatmap(hourlyHeatmap)
                 .build();
     }
@@ -687,27 +708,75 @@ public class UrlShortenerService {
     }
 
     private void publishClickEvent(String shortCode, HttpServletRequest request) {
+        publishClickEvent(shortCode, request, null);
+    }
+
+    private void publishClickEvent(String shortCode, HttpServletRequest request, UrlMapping mapping) {
         String clientIp = getClientIp(request);
-        String userAgent = request.getHeader("User-Agent");
+        String userAgent = request != null ? request.getHeader("User-Agent") : null;
         GeoIpService.GeoLocation location = geoIpService.resolveLocation(clientIp);
 
         boolean isBot = botDetectorService.isBot(userAgent);
         String botCategory = isBot ? botDetectorService.getBotCategory(userAgent) : null;
+
+        // UTM Parametrelerini topla: Önce gelen HTTP isteğinden, yoksa hedef mapping'in originalUrl'sinden
+        String utmSource = request != null ? request.getParameter("utm_source") : null;
+        String utmMedium = request != null ? request.getParameter("utm_medium") : null;
+        String utmCampaign = request != null ? request.getParameter("utm_campaign") : null;
+        String utmTerm = request != null ? request.getParameter("utm_term") : null;
+        String utmContent = request != null ? request.getParameter("utm_content") : null;
+
+        if (mapping != null && mapping.getOriginalUrl() != null) {
+            Map<String, String> queryParams = parseQueryParams(mapping.getOriginalUrl());
+            if (utmSource == null || utmSource.trim().isEmpty()) utmSource = queryParams.get("utm_source");
+            if (utmMedium == null || utmMedium.trim().isEmpty()) utmMedium = queryParams.get("utm_medium");
+            if (utmCampaign == null || utmCampaign.trim().isEmpty()) utmCampaign = queryParams.get("utm_campaign");
+            if (utmTerm == null || utmTerm.trim().isEmpty()) utmTerm = queryParams.get("utm_term");
+            if (utmContent == null || utmContent.trim().isEmpty()) utmContent = queryParams.get("utm_content");
+        }
 
         ClickEventDto clickEvent = ClickEventDto.builder()
                 .shortCode(shortCode)
                 .clickedAt(System.currentTimeMillis())
                 .ipAddress(clientIp)
                 .userAgent(userAgent)
-                .referrer(request.getHeader("Referer"))
+                .referrer(request != null ? request.getHeader("Referer") : null)
                 .country(location.getCountry())
                 .countryCode(location.getCountryCode())
                 .city(location.getCity())
                 .bot(isBot)
                 .botCategory(botCategory)
+                .utmSource(utmSource != null && !utmSource.trim().isEmpty() ? utmSource.trim() : null)
+                .utmMedium(utmMedium != null && !utmMedium.trim().isEmpty() ? utmMedium.trim() : null)
+                .utmCampaign(utmCampaign != null && !utmCampaign.trim().isEmpty() ? utmCampaign.trim() : null)
+                .utmTerm(utmTerm != null && !utmTerm.trim().isEmpty() ? utmTerm.trim() : null)
+                .utmContent(utmContent != null && !utmContent.trim().isEmpty() ? utmContent.trim() : null)
                 .build();
 
         clickEventPublisher.publishClickEvent(clickEvent);
+    }
+
+    private Map<String, String> parseQueryParams(String url) {
+        Map<String, String> params = new HashMap<>();
+        if (url == null || !url.contains("?")) {
+            return params;
+        }
+        try {
+            int qIdx = url.indexOf('?');
+            String query = url.substring(qIdx + 1);
+            int hashIdx = query.indexOf('#');
+            if (hashIdx >= 0) {
+                query = query.substring(0, hashIdx);
+            }
+            for (String param : query.split("&")) {
+                String[] pair = param.split("=", 2);
+                if (pair.length == 2 && !pair[0].isEmpty()) {
+                    params.put(java.net.URLDecoder.decode(pair[0], java.nio.charset.StandardCharsets.UTF_8),
+                               java.net.URLDecoder.decode(pair[1], java.nio.charset.StandardCharsets.UTF_8));
+                }
+            }
+        } catch (Exception ignored) {}
+        return params;
     }
 
     private String parseDevice(String userAgent) {

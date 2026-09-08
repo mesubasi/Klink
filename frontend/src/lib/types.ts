@@ -166,6 +166,9 @@ export interface AnalyticsSummaryResponse {
   clicksByCountry?: Record<string, number>;
   clicksByCity?: Record<string, number>;
   clicksByBotCategory?: Record<string, number>;
+  clicksByUtmSource?: Record<string, number>;
+  clicksByUtmCampaign?: Record<string, number>;
+  clicksByUtmMedium?: Record<string, number>;
   hourlyHeatmap?: number[][];
 }
 

@@ -17,7 +17,9 @@ import {
   CheckCircle2,
   Clock,
   Split,
-  Trophy
+  Trophy,
+  Tag,
+  Target
 } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
 import { AnalyticsSummaryResponse, AbTestConfigResponse } from '@/lib/types';
@@ -557,6 +559,64 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* UTM Campaign Breakdown */}
+            {((data.clicksByUtmSource && Object.keys(data.clicksByUtmSource).length > 0) ||
+              (data.clicksByUtmCampaign && Object.keys(data.clicksByUtmCampaign).length > 0)) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* UTM Source */}
+                <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/80 space-y-3">
+                  <div className="flex items-center gap-2 text-zinc-950 font-bold">
+                    <Tag className="w-4 h-4 text-blue-600" />
+                    <span>{lang === 'tr' ? 'UTM Kaynakları (utm_source)' : 'UTM Sources'}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {Object.entries(data.clicksByUtmSource || {}).map(([source, count]) => (
+                      <div key={source} className="space-y-1">
+                        <div className="flex justify-between text-[11px] text-zinc-700 font-medium">
+                          <span className="truncate max-w-[150px] font-mono text-blue-600 font-semibold">{source}</span>
+                          <span className="font-mono font-bold text-zinc-950">{count}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-600 rounded-full"
+                            style={{
+                              width: `${Math.min(100, (count / (data.totalClicks || 1)) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* UTM Campaign */}
+                <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/80 space-y-3">
+                  <div className="flex items-center gap-2 text-zinc-950 font-bold">
+                    <Target className="w-4 h-4 text-emerald-600" />
+                    <span>{lang === 'tr' ? 'UTM Kampanyaları (utm_campaign)' : 'UTM Campaigns'}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {Object.entries(data.clicksByUtmCampaign || {}).map(([camp, count]) => (
+                      <div key={camp} className="space-y-1">
+                        <div className="flex justify-between text-[11px] text-zinc-700 font-medium">
+                          <span className="truncate max-w-[150px] font-mono text-emerald-600 font-semibold">{camp}</span>
+                          <span className="font-mono font-bold text-zinc-950">{count}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-600 rounded-full"
+                            style={{
+                              width: `${Math.min(100, (count / (data.totalClicks || 1)) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Daily Date Breakdown */}
             <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/80 space-y-3">

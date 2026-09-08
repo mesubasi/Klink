@@ -23,13 +23,23 @@ public class ClickEventDto implements Serializable {
     private UUID variantId;
     private String variantLabel;
 
+    private String utmSource;
+    private String utmMedium;
+    private String utmCampaign;
+    private String utmTerm;
+    private String utmContent;
+
     public ClickEventDto() {}
 
     public ClickEventDto(String shortCode, Long clickedAt, String ipAddress, String userAgent, String referrer, String country, String countryCode, String city, boolean bot, String botCategory) {
-        this(shortCode, clickedAt, ipAddress, userAgent, referrer, country, countryCode, city, bot, botCategory, null, null);
+        this(shortCode, clickedAt, ipAddress, userAgent, referrer, country, countryCode, city, bot, botCategory, null, null, null, null, null, null, null);
     }
 
     public ClickEventDto(String shortCode, Long clickedAt, String ipAddress, String userAgent, String referrer, String country, String countryCode, String city, boolean bot, String botCategory, UUID variantId, String variantLabel) {
+        this(shortCode, clickedAt, ipAddress, userAgent, referrer, country, countryCode, city, bot, botCategory, variantId, variantLabel, null, null, null, null, null);
+    }
+
+    public ClickEventDto(String shortCode, Long clickedAt, String ipAddress, String userAgent, String referrer, String country, String countryCode, String city, boolean bot, String botCategory, UUID variantId, String variantLabel, String utmSource, String utmMedium, String utmCampaign, String utmTerm, String utmContent) {
         this.shortCode = shortCode;
         this.clickedAt = clickedAt;
         this.ipAddress = ipAddress;
@@ -42,6 +52,11 @@ public class ClickEventDto implements Serializable {
         this.botCategory = botCategory;
         this.variantId = variantId;
         this.variantLabel = variantLabel;
+        this.utmSource = utmSource;
+        this.utmMedium = utmMedium;
+        this.utmCampaign = utmCampaign;
+        this.utmTerm = utmTerm;
+        this.utmContent = utmContent;
     }
 
     public static Builder builder() {
@@ -61,6 +76,11 @@ public class ClickEventDto implements Serializable {
         private String botCategory;
         private UUID variantId;
         private String variantLabel;
+        private String utmSource;
+        private String utmMedium;
+        private String utmCampaign;
+        private String utmTerm;
+        private String utmContent;
 
         public Builder shortCode(String shortCode) { this.shortCode = shortCode; return this; }
         public Builder clickedAt(Long clickedAt) { this.clickedAt = clickedAt; return this; }
@@ -74,9 +94,14 @@ public class ClickEventDto implements Serializable {
         public Builder botCategory(String botCategory) { this.botCategory = botCategory; return this; }
         public Builder variantId(UUID variantId) { this.variantId = variantId; return this; }
         public Builder variantLabel(String variantLabel) { this.variantLabel = variantLabel; return this; }
+        public Builder utmSource(String utmSource) { this.utmSource = utmSource; return this; }
+        public Builder utmMedium(String utmMedium) { this.utmMedium = utmMedium; return this; }
+        public Builder utmCampaign(String utmCampaign) { this.utmCampaign = utmCampaign; return this; }
+        public Builder utmTerm(String utmTerm) { this.utmTerm = utmTerm; return this; }
+        public Builder utmContent(String utmContent) { this.utmContent = utmContent; return this; }
 
         public ClickEventDto build() {
-            return new ClickEventDto(shortCode, clickedAt, ipAddress, userAgent, referrer, country, countryCode, city, bot, botCategory, variantId, variantLabel);
+            return new ClickEventDto(shortCode, clickedAt, ipAddress, userAgent, referrer, country, countryCode, city, bot, botCategory, variantId, variantLabel, utmSource, utmMedium, utmCampaign, utmTerm, utmContent);
         }
     }
 
@@ -104,4 +129,14 @@ public class ClickEventDto implements Serializable {
     public void setVariantId(UUID variantId) { this.variantId = variantId; }
     public String getVariantLabel() { return variantLabel; }
     public void setVariantLabel(String variantLabel) { this.variantLabel = variantLabel; }
+    public String getUtmSource() { return utmSource; }
+    public void setUtmSource(String utmSource) { this.utmSource = utmSource; }
+    public String getUtmMedium() { return utmMedium; }
+    public void setUtmMedium(String utmMedium) { this.utmMedium = utmMedium; }
+    public String getUtmCampaign() { return utmCampaign; }
+    public void setUtmCampaign(String utmCampaign) { this.utmCampaign = utmCampaign; }
+    public String getUtmTerm() { return utmTerm; }
+    public void setUtmTerm(String utmTerm) { this.utmTerm = utmTerm; }
+    public String getUtmContent() { return utmContent; }
+    public void setUtmContent(String utmContent) { this.utmContent = utmContent; }
 }

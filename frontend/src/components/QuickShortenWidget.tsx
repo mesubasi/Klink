@@ -29,7 +29,8 @@ import {
   Plus,
   Trash2,
   PieChart,
-  MousePointerClick
+  MousePointerClick,
+  Megaphone
 } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
 import { ShortenRequest, ShortenResponse } from '@/lib/types';
@@ -66,6 +67,12 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
   const [desktopUrl, setDesktopUrl] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
   const [webhookSecret, setWebhookSecret] = useState('');
+  const [showUtm, setShowUtm] = useState(false);
+  const [utmSource, setUtmSource] = useState('');
+  const [utmMedium, setUtmMedium] = useState('');
+  const [utmCampaign, setUtmCampaign] = useState('');
+  const [utmTerm, setUtmTerm] = useState('');
+  const [utmContent, setUtmContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [result, setResult] = useState<ShortenResponse | null>(null);
@@ -79,6 +86,23 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
     { label: 'Varyant A', targetUrl: '', weightPercent: 50 },
     { label: 'Varyant B', targetUrl: '', weightPercent: 50 },
   ]);
+
+  const applyUtm = (url: string) => {
+    if (!url || (!utmSource.trim() && !utmMedium.trim() && !utmCampaign.trim() && !utmTerm.trim() && !utmContent.trim())) {
+      return url;
+    }
+    try {
+      const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
+      if (utmSource.trim()) parsed.searchParams.set('utm_source', utmSource.trim());
+      if (utmMedium.trim()) parsed.searchParams.set('utm_medium', utmMedium.trim());
+      if (utmCampaign.trim()) parsed.searchParams.set('utm_campaign', utmCampaign.trim());
+      if (utmTerm.trim()) parsed.searchParams.set('utm_term', utmTerm.trim());
+      if (utmContent.trim()) parsed.searchParams.set('utm_content', utmContent.trim());
+      return parsed.toString();
+    } catch {
+      return url;
+    }
+  };
 
   // Extract domain preview
   const getDomainPreview = (url: string) => {
@@ -130,8 +154,10 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
       }
     }
 
+    const finalTargetUrl = applyUtm(originalUrl.trim());
+
     const req: ShortenRequest = {
-      originalUrl: originalUrl.trim() || (abTestingEnabled && variants[0]?.targetUrl ? variants[0].targetUrl.trim() : ''),
+      originalUrl: finalTargetUrl || (abTestingEnabled && variants[0]?.targetUrl ? variants[0].targetUrl.trim() : ''),
       customAlias: customAlias.trim() || undefined,
       expirationDays: expirationDays ? Number(expirationDays) : undefined,
       maxClicks: maxClicks ? Number(maxClicks) : undefined,
@@ -166,6 +192,11 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
       setDesktopUrl('');
       setWebhookUrl('');
       setWebhookSecret('');
+      setUtmSource('');
+      setUtmMedium('');
+      setUtmCampaign('');
+      setUtmTerm('');
+      setUtmContent('');
       setAbTestingEnabled(false);
       setVariants([
         { label: 'Varyant A', targetUrl: '', weightPercent: 50 },
@@ -446,6 +477,173 @@ export const QuickShortenWidget: React.FC<QuickShortenWidgetProps> = ({
                     <p className="text-[11px] text-zinc-500 leading-normal">{t.previewToggleDesc}</p>
                   </div>
                 </label>
+              </div>
+
+              {/* UTM Campaign Builder Section */}
+              <div className="pt-3 border-t border-zinc-200/70 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowUtm(!showUtm)}
+                  className="w-full flex items-center justify-between text-xs font-bold text-zinc-900 hover:text-zinc-950 py-1 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Megaphone className="w-4 h-4 text-amber-600" />
+                    <span>{lang === 'tr' ? '🎯 UTM Kampanya Parametreleri (UTM Builder)' : '🎯 UTM Campaign Builder'}</span>
+                    {(utmSource || utmMedium || utmCampaign || utmTerm || utmContent) && (
+                      <Badge variant="secondary" className="text-[9px] bg-amber-100 text-amber-800 border-amber-200">
+                        {lang === 'tr' ? 'Aktif' : 'Active'}
+                      </Badge>
+                    )}
+                  </div>
+                  {showUtm ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
+                </button>
+
+                {showUtm && (
+                  <div className="p-3.5 rounded-xl bg-white border border-zinc-200/80 space-y-3.5 animate-fadeIn">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <p className="text-[11px] text-zinc-500">
+                        {lang === 'tr'
+                          ? 'Google Analytics ve pazarlama araçları için hedef URL’e otomatik UTM parametreleri ekleyin.'
+                          : 'Append UTM campaign parameters to your destination URL for Google Analytics & ads tracking.'}
+                      </p>
+                      
+                      {/* Clear / Reset Button */}
+                      {(utmSource || utmMedium || utmCampaign || utmTerm || utmContent) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUtmSource('');
+                            setUtmMedium('');
+                            setUtmCampaign('');
+                            setUtmTerm('');
+                            setUtmContent('');
+                          }}
+                          className="text-[11px] text-rose-600 hover:underline shrink-0 cursor-pointer"
+                        >
+                          {lang === 'tr' ? 'Parametreleri Temizle' : 'Clear UTMs'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Presets */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                        {lang === 'tr' ? 'Hızlı Şablonlar:' : 'Quick Presets:'}
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {[
+                          { label: 'Google Ads', s: 'google', m: 'cpc' },
+                          { label: 'Meta / FB', s: 'facebook', m: 'social' },
+                          { label: 'Twitter / X', s: 'twitter', m: 'social' },
+                          { label: 'LinkedIn', s: 'linkedin', m: 'social' },
+                          { label: 'E-Bülten', s: 'newsletter', m: 'email' },
+                          { label: 'Instagram', s: 'instagram', m: 'social' },
+                        ].map((preset) => (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => {
+                              setUtmSource(preset.s);
+                              setUtmMedium(preset.m);
+                            }}
+                            className="px-2 py-1 rounded-md text-[10px] font-medium border border-zinc-200 hover:border-zinc-400 bg-zinc-50 hover:bg-white text-zinc-700 transition-colors cursor-pointer"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* UTM Input Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-zinc-700">
+                          utm_source <span className="text-rose-500">*</span>
+                        </label>
+                        <Input
+                          type="text"
+                          value={utmSource}
+                          onChange={(e) => setUtmSource(e.target.value)}
+                          placeholder="google, newsletter, twitter"
+                          className="text-xs h-8.5 font-mono bg-zinc-50/50"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-zinc-700">
+                          utm_medium <span className="text-rose-500">*</span>
+                        </label>
+                        <Input
+                          type="text"
+                          value={utmMedium}
+                          onChange={(e) => setUtmMedium(e.target.value)}
+                          placeholder="cpc, email, social, banner"
+                          className="text-xs h-8.5 font-mono bg-zinc-50/50"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-zinc-700">
+                          utm_campaign <span className="text-zinc-400">(Opsiyonel)</span>
+                        </label>
+                        <Input
+                          type="text"
+                          value={utmCampaign}
+                          onChange={(e) => setUtmCampaign(e.target.value)}
+                          placeholder="bahar_indirimi, launch_2026"
+                          className="text-xs h-8.5 font-mono bg-zinc-50/50"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-zinc-700">
+                          utm_term <span className="text-zinc-400">(Opsiyonel)</span>
+                        </label>
+                        <Input
+                          type="text"
+                          value={utmTerm}
+                          onChange={(e) => setUtmTerm(e.target.value)}
+                          placeholder="link+kisaltma, url"
+                          className="text-xs h-8.5 font-mono bg-zinc-50/50"
+                        />
+                      </div>
+
+                      <div className="space-y-1 sm:col-span-2">
+                        <label className="text-[11px] font-semibold text-zinc-700">
+                          utm_content <span className="text-zinc-400">(Opsiyonel)</span>
+                        </label>
+                        <Input
+                          type="text"
+                          value={utmContent}
+                          onChange={(e) => setUtmContent(e.target.value)}
+                          placeholder="header_cta, alt_banner"
+                          className="text-xs h-8.5 font-mono bg-zinc-50/50"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Preview of Final URL */}
+                    {originalUrl.trim() && (utmSource || utmMedium || utmCampaign) && (
+                      <div className="p-2.5 rounded-lg bg-zinc-50 border border-zinc-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px]">
+                        <div className="space-y-0.5 truncate max-w-full sm:max-w-[80%]">
+                          <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                            {lang === 'tr' ? 'Oluşturulacak Nihai Hedef URL:' : 'Final Generated URL:'}
+                          </span>
+                          <span className="font-mono text-emerald-700 dark:text-emerald-400 truncate block">
+                            {applyUtm(originalUrl.trim())}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setOriginalUrl(applyUtm(originalUrl.trim()))}
+                          className="px-2.5 py-1 rounded bg-zinc-900 text-white hover:bg-zinc-800 text-[10px] font-medium shrink-0 cursor-pointer"
+                        >
+                          {lang === 'tr' ? 'URL’e Aktar' : 'Sync to URL'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Device Targeting Section (Cihaza Göre Yönlendirme) */}
