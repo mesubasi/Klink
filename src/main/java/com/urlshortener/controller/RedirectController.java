@@ -1,10 +1,13 @@
 package com.urlshortener.controller;
 
+import com.urlshortener.exception.UrlNotFoundException;
 import com.urlshortener.model.UrlMapping;
 import com.urlshortener.service.UrlShortenerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -25,8 +28,19 @@ public class RedirectController {
     @Value("${app.frontend.preview-url:http://localhost:3000/preview/%s}")
     private String previewUrlPattern;
 
-    public RedirectController(UrlShortenerService urlShortenerService) {
+    private final MeterRegistry meterRegistry;
+
+    public RedirectController(UrlShortenerService urlShortenerService, MeterRegistry meterRegistry) {
         this.urlShortenerService = urlShortenerService;
+        this.meterRegistry = meterRegistry;
+    }
+
+    private void recordRedirect(Timer.Sample sample, String outcome) {
+        sample.stop(Timer.builder("klink.redirect")
+                .description("Short link redirect latency")
+                .publishPercentileHistogram()
+                .tag("outcome", outcome)
+                .register(meterRegistry));
     }
 
     @GetMapping("/{shortCode:[a-zA-Z0-9_-]{3,20}}")
@@ -38,20 +52,30 @@ public class RedirectController {
             @RequestParam(name = "direct", defaultValue = "false") boolean direct,
             HttpServletRequest request) {
 
-        UrlMapping mapping = urlShortenerService.getUrlMapping(shortCode);
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "error";
+        try {
+            UrlMapping mapping = urlShortenerService.getUrlMapping(shortCode);
 
-        if (mapping.isPreviewEnabled() && !direct) {
-            String previewUrl = String.format(previewUrlPattern, shortCode);
+            if (mapping.isPreviewEnabled() && !direct) {
+                String previewUrl = String.format(previewUrlPattern, shortCode);
+                outcome = "preview";
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .location(URI.create(previewUrl))
+                        .build();
+            }
+
+            String originalUrl = urlShortenerService.getOriginalUrlAndRecordClick(shortCode, request);
+            outcome = "redirect";
             return ResponseEntity.status(HttpStatus.FOUND)
-                    .location(URI.create(previewUrl))
+                    .location(URI.create(originalUrl))
                     .build();
+        } catch (UrlNotFoundException e) {
+            outcome = "not_found";
+            throw e;
+        } finally {
+            recordRedirect(sample, outcome);
         }
-
-        String originalUrl = urlShortenerService.getOriginalUrlAndRecordClick(shortCode, request);
-
-        return ResponseEntity.status(HttpStatus.FOUND)
-                .location(URI.create(originalUrl))
-                .build();
     }
 
     @GetMapping("/{shortCode:[a-zA-Z0-9_-]{3,20}}\\+")

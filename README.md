@@ -189,7 +189,9 @@ Create a `.env` file based on `.env.example`:
 | `POST` | `/api/v1/urls/shorten` | Shorten a single URL with deep-link & security options | Public / User |
 | `POST` | `/api/v1/urls/bulk-shorten` | Batch shorten multiple URLs (up to 50) | User / Admin |
 | `GET` | `/api/v1/urls/my-urls` | Retrieve all shortened URLs for authenticated user | User / Admin |
-| `GET` | `/api/v1/urls/my-urls/search` | Search (`q`) and paginate (`page`, `size` ≤ 100, `sortBy`, `direction`) your links | User / Admin |
+| `GET` | `/api/v1/urls/my-urls/search` | Search (`q`), filter (`ALL`, `PROTECTED`, `PREVIEW`, `BROKEN`) and paginate (`page`, `size` ≤ 100, `sortBy`, `direction`) your links | User / Admin |
+| `GET` | `/api/v1/urls/my-urls/stats` | Aggregate counters for your links (total, clicks, protected, broken, healthy) | User / Admin |
+| `GET` | `/actuator/prometheus` | Prometheus metrics (redirect latency, click events, RabbitMQ queue depth) | Admin |
 | `GET` | `/api/v1/urls/{shortCode}/analytics` | Comprehensive click telemetry & geo stats | Owner / Admin |
 | `GET` | `/api/v1/urls/{shortCode}/qrcode` | Generate dynamic customized PNG or SVG QR code | Public |
 | `POST` | `/api/v1/urls/qrcode/custom` | Generate standalone custom QR code from any payload | Public |
@@ -198,6 +200,16 @@ Create a `.env` file based on `.env.example`:
 | `POST` | `/api/v1/bio/me` | Create or update authenticated user's bio page | User / Admin |
 | `POST` | `/api/v1/api-keys/apply` | Apply for a developer API key | User / Admin |
 | `POST` | `/api/v1/auth/2fa/setup` | Initialize TOTP 2FA secret and QR code | User / Admin |
+
+### 📈 Metrics
+
+Prometheus metrics are exposed at `/actuator/prometheus` and require an admin JWT (`Authorization: Bearer <token>`):
+
+| Metric | Description |
+| :--- | :--- |
+| `klink_redirect_seconds` | Redirect latency histogram, tagged by `outcome` (`redirect`, `preview`, `not_found`, `error`) |
+| `klink_click_events_total` | Click events by `outcome` (`queued`, `fallback_db`, `failed`) |
+| `klink_rabbitmq_queue_messages` / `klink_rabbitmq_queue_consumers` | Click queue depth and consumers (`NaN` when the broker is unreachable) |
 
 Full interactive API explorer is available at: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
 
