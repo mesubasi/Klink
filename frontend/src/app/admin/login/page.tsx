@@ -41,7 +41,7 @@ export default function AdminLoginPage() {
         setStep('2fa');
         setSuccessMsg('2FA Koruması: Lütfen authenticator kodunuzu girin.');
       } else {
-        completeLogin(authRes.username, authRes.role);
+        completeLogin(authRes.username, authRes.role, authRes.accessToken);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Yönetici bilgileri hatalı veya yetkisiz erişim!');
@@ -69,7 +69,7 @@ export default function AdminLoginPage() {
         throw new Error('Erişim Reddedildi: Yetersiz yetki düzeyi.');
       }
 
-      completeLogin(res.username, res.role);
+      completeLogin(res.username, res.role, res.accessToken);
     } catch (err: any) {
       setErrorMsg(err.message || 'Geçersiz 2FA doğrulama kodu!');
     } finally {
@@ -77,9 +77,9 @@ export default function AdminLoginPage() {
     }
   };
 
-  const completeLogin = (userUsername: string, role: string) => {
-    localStorage.setItem('klink_user', JSON.stringify({ u: userUsername, p: password.trim(), role }));
-    localStorage.setItem('swiftlink_user', JSON.stringify({ u: userUsername, p: password.trim(), role }));
+  const completeLogin = (userUsername: string, role: string, token?: string) => {
+    localStorage.setItem('klink_user', JSON.stringify({ u: userUsername, p: password.trim(), role, token }));
+    localStorage.setItem('swiftlink_user', JSON.stringify({ u: userUsername, p: password.trim(), role, token }));
     setSuccessMsg('Yetkilendirme başarılı! Admin CRM paneline yönlendiriliyorsunuz...');
     setTimeout(() => {
       window.location.href = '/admin';

@@ -2,6 +2,10 @@ import {
   ShortenRequest, 
   ShortenResponse, 
   PagedResponse,
+  WorkspaceInvitationResponse,
+  InviteMemberResponse,
+  InvitationPreviewResponse,
+  AcceptInvitationResponse,
   LinkStatsResponse,
   BulkShortenRequest, 
   BulkShortenResponse, 
@@ -965,6 +969,111 @@ export class ApiClient {
     if (!res || !res.ok) {
       const errorData = await res?.json().catch(() => null);
       throw new Error(errorData?.message || 'Üye eklenemedi.');
+    }
+
+    return await res.json();
+  }
+
+  // 31.1 POST /api/v1/workspaces/{workspaceId}/invitations
+  static async inviteWorkspaceMember(
+    workspaceId: string,
+    request: AddWorkspaceMemberRequest,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<InviteMemberResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces/${workspaceId}/invitations`, {
+      method: 'POST',
+      headers: this.getHeaders(lang, authUser),
+      body: JSON.stringify(request),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Davet gönderilemedi.');
+    }
+
+    return await res.json();
+  }
+
+  // 31.2 GET /api/v1/workspaces/{workspaceId}/invitations
+  static async getWorkspaceInvitations(
+    workspaceId: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<WorkspaceInvitationResponse[]> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces/${workspaceId}/invitations`, {
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      return [];
+    }
+
+    return await res.json();
+  }
+
+  // 31.3 DELETE /api/v1/workspaces/{workspaceId}/invitations/{invitationId}
+  static async revokeWorkspaceInvitation(
+    workspaceId: string,
+    invitationId: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<void> {
+    const res = await this.safeFetch(`${API_BASE_URL}/workspaces/${workspaceId}/invitations/${invitationId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Davet iptal edilemedi.');
+    }
+  }
+
+  // 31.4 GET /api/v1/invitations/{token} (public)
+  static async getInvitationPreview(token: string, lang: string = 'tr'): Promise<InvitationPreviewResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/invitations/${encodeURIComponent(token)}`, {
+      headers: this.getHeaders(lang),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Davet bağlantısı geçersiz veya süresi dolmuş.');
+    }
+
+    return await res.json();
+  }
+
+  // 31.5 POST /api/v1/invitations/{token}/accept
+  static async acceptInvitation(
+    token: string,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<AcceptInvitationResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/invitations/${encodeURIComponent(token)}/accept`, {
+      method: 'POST',
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Davet kabul edilemedi.');
+    }
+
+    return await res.json();
+  }
+
+  // 31.6 GET /api/v1/admin/workspaces (system admin)
+  static async getAllWorkspaces(
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<WorkspaceResponse[]> {
+    const res = await this.safeFetch(`${API_BASE_URL}/admin/workspaces`, {
+      headers: this.getHeaders(lang, authUser),
+    });
+
+    if (!res || !res.ok) {
+      return [];
     }
 
     return await res.json();

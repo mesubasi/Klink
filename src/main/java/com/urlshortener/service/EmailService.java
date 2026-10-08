@@ -2,6 +2,7 @@ package com.urlshortener.service;
 
 import com.urlshortener.model.UrlMapping;
 import jakarta.mail.internet.MimeMessage;
+import org.springframework.web.util.HtmlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -66,6 +67,45 @@ public class EmailService {
             log.info("📧 [E-posta Gönderildi] Kırık link uyarı e-postası başarıyla iletildi: Kime: {}, Link: /{}", recipientEmail, shortCode);
         } catch (Exception e) {
             log.warn("⚠️ Kırık link uyarı e-postası gönderilemedi ({}/{}): {}", recipientEmail, shortCode, e.getMessage());
+        }
+    }
+
+    /**
+     * Sends a workspace invitation email synchronously.
+     * Returns false when SMTP is not configured or sending fails, so callers can show the link to the inviter instead.
+     */
+    public boolean sendWorkspaceInvitation(String recipientEmail, String workspaceName, String inviterName,
+                                           String role, String inviteUrl, long expiresAt) {
+        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+        if (mailSender == null) {
+            log.info("📧 [Simüle E-posta] Çalışma alanı daveti hazırlandı (SMTP devre dışı): Kime: {}, Alan: {}", recipientEmail, workspaceName);
+            return false;
+        }
+
+        String expiry = Instant.ofEpochMilli(expiresAt).atZone(ZoneId.systemDefault()).format(FORMATTER);
+        String htmlBody = "<!DOCTYPE html><html><body style='font-family: Arial, sans-serif; background-color: #f9f9fb; padding: 24px;'>"
+                + "<div style='max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 28px;'>"
+                + "<h2 style='margin: 0 0 12px; font-size: 20px; color: #111827;'>Klink çalışma alanına davet edildiniz</h2>"
+                + "<p style='color: #4b5563; font-size: 14px; line-height: 1.6;'><strong>" + HtmlUtils.htmlEscape(inviterName) + "</strong>, sizi <strong>"
+                + HtmlUtils.htmlEscape(workspaceName) + "</strong> çalışma alanına <strong>" + HtmlUtils.htmlEscape(role) + "</strong> rolüyle davet etti.</p>"
+                + "<p style='margin: 24px 0;'><a href='" + HtmlUtils.htmlEscape(inviteUrl) + "' style='background: #111827; color: #ffffff; padding: 12px 20px; border-radius: 10px; text-decoration: none; font-size: 14px;'>Daveti Kabul Et</a></p>"
+                + "<p style='color: #6b7280; font-size: 12px;'>Bu davet " + expiry + " tarihine kadar geçerlidir ve yalnızca bu e-posta adresiyle kullanılabilir.</p>"
+                + "<p style='color: #9ca3af; font-size: 11px; margin-top: 24px; text-align: center;'>Klink &copy; 2026</p>"
+                + "</div></body></html>";
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(recipientEmail);
+            helper.setSubject("Klink: " + workspaceName + " çalışma alanına davet edildiniz");
+            helper.setText(htmlBody, true);
+            mailSender.send(message);
+            log.info("📧 [E-posta Gönderildi] Çalışma alanı daveti iletildi: Kime: {}, Alan: {}", recipientEmail, workspaceName);
+            return true;
+        } catch (Exception e) {
+            log.warn("⚠️ Çalışma alanı daveti gönderilemedi ({}): {}", recipientEmail, e.getMessage());
+            return false;
         }
     }
 
