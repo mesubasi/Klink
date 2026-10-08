@@ -128,6 +128,7 @@ class AuthTokenServiceTest {
 
         assertEquals("ENCODED", user.getPassword());
         assertTrue(user.isEmailVerified());
+        assertEquals(1, user.getTokenVersion(), "tokens issued before the reset must stop working");
         assertNotNull(stored.getUsedAt());
         verify(tokenRepository).invalidateOpenTokens(eq(user.getId()), eq(AuthTokenType.PASSWORD_RESET), anyLong());
     }

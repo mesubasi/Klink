@@ -61,7 +61,7 @@ public class AuthService {
         }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String token = tokenProvider.generateToken(authentication);
+        String token = tokenProvider.generateToken(user);
 
         return AuthResponse.builder()
                 .username(user.getUsername())
@@ -95,7 +95,7 @@ public class AuthService {
         }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String token = tokenProvider.generateToken(authentication);
+        String token = tokenProvider.generateToken(user);
 
         return AuthResponse.builder()
                 .username(user.getUsername())
@@ -130,7 +130,7 @@ public class AuthService {
         userRepository.save(user);
         authTokenService.sendEmailVerification(user);
 
-        String token = tokenProvider.generateTokenFromUsername(user.getUsername());
+        String token = tokenProvider.generateToken(user);
 
         return AuthResponse.builder()
                 .username(user.getUsername())
@@ -227,6 +227,15 @@ public class AuthService {
         UserAccount user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException(messageService.getMessage("user.not_found", username)));
         return authTokenService.sendEmailVerification(user);
+    }
+
+    /** Signs the user out of every device: all tokens issued so far stop working. */
+    @Transactional
+    public void logoutEverywhere(String username) {
+        UserAccount user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException(messageService.getMessage("user.not_found", username)));
+        user.revokeAllTokens();
+        userRepository.save(user);
     }
 
     public String getLogoutMessage() {

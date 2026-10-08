@@ -42,6 +42,10 @@ public class UserAccount implements Serializable {
     @Column(nullable = false)
     private boolean emailVerified = false;
 
+    /** Embedded in every JWT; incrementing it revokes all tokens issued before. */
+    @Column(nullable = false)
+    private int tokenVersion = 0;
+
     public UserAccount() {}
 
     public UserAccount(UUID id, String username, String email, String password, String role, boolean twoFactorEnabled, String twoFactorSecret, Long createdAt) {
@@ -113,6 +117,9 @@ public class UserAccount implements Serializable {
     public void setTwoFactorSecret(String twoFactorSecret) { this.twoFactorSecret = twoFactorSecret; }
     public Long getCreatedAt() { return createdAt; }
     public void setCreatedAt(Long createdAt) { this.createdAt = createdAt; }
+    public int getTokenVersion() { return tokenVersion; }
+    public void setTokenVersion(int tokenVersion) { this.tokenVersion = tokenVersion; }
+    public void revokeAllTokens() { this.tokenVersion++; }
     public boolean isEmailVerified() { return emailVerified; }
     public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
 }

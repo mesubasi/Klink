@@ -99,6 +99,8 @@ public class AuthTokenService {
         user.setPassword(passwordEncoder.encode(newPassword));
         // Receiving the link proves control of the mailbox.
         user.setEmailVerified(true);
+        // Anyone holding a token from before the reset (e.g. an attacker who had the old password) is signed out.
+        user.revokeAllTokens();
         userRepository.save(user);
 
         long now = System.currentTimeMillis();

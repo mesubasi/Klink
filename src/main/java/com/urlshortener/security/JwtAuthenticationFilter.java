@@ -37,6 +37,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String username = tokenProvider.getUsernameFromJwt(jwt);
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                // A password reset or "sign out everywhere" bumps the account's version and kills older tokens.
+                if (userDetails instanceof KlinkUserDetails klink
+                        && klink.getTokenVersion() != tokenProvider.getTokenVersionFromJwt(jwt)) {
+                    logger.debug("Rejected a revoked JWT for user " + username);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

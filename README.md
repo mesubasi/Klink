@@ -105,15 +105,22 @@ The fastest and easiest way to run the entire Klink stack (**PostgreSQL + Redis 
 git clone https://github.com/mesubasi/Klink.git
 cd Klink
 
-# 2. Launch the entire stack in one click
+# 2. Create your .env with your own secrets (the stack refuses to start without them)
+cp .env.example .env
+#    then set JWT_SECRET, DATABASE_PASSWORD and RABBITMQ_PASSWORD, e.g.:
+#      openssl rand -base64 32
+#    (PowerShell: [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)))
+#    and BOOTSTRAP_ADMIN_USERNAME / _EMAIL / _PASSWORD for your first platform admin.
+
+# 3. Launch the entire stack
 docker compose up -d --build
 ```
 
-That's it! Once containers are healthy:
+Once containers are healthy:
 - 🌐 **Web Dashboard**: [http://localhost:3000](http://localhost:3000)
 - 🔌 **REST API & Endpoints**: [http://localhost:8080](http://localhost:8080)
 - 📖 **Interactive Swagger UI**: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-- 🐰 **RabbitMQ Management**: [http://localhost:15672](http://localhost:15672) (User/Pass: `klink_mq` / `klink_mq_pass`)
+- 🐰 **RabbitMQ Management**: [http://localhost:15672](http://localhost:15672) (user `RABBITMQ_USERNAME`, password `RABBITMQ_PASSWORD` from your `.env`). PostgreSQL, Redis and RabbitMQ are only published on `127.0.0.1`; use an SSH tunnel to reach them remotely.
 
 To stop all services:
 ```bash
@@ -133,7 +140,7 @@ If you want to run backend and frontend natively for development:
 
 ### 2. Start Supporting Infrastructure
 ```bash
-docker compose up -d redis rabbitmq postgres
+docker compose up -d redis rabbitmq postgres   # needs the .env from the quickstart (secrets are required)
 ```
 
 ### 3. Start Backend (Spring Boot)
@@ -235,7 +242,9 @@ Klink is multi-tenant: every customer company is a workspace.
 - "Şifremi unuttum" sends a 1-hour, single-use reset link; the response is identical whether or not the email exists. Using the link also verifies the email. Reset and verification links are stored hashed.
 - Registration, password reset and verification calls are rate limited per IP on top of the global limiter.
 - **No well-known accounts in production.** `admin/admin123` and `user/password` are only created when `SEED_DEMO_USERS=true` (the development default; off with the `prod` profile). Create the first platform admin with `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` (12+ characters); it is only used while no admin exists. Databases created by older versions may still contain the demo accounts: the app logs a security warning at startup until you change or delete them.
-- `docker-compose.prod.yml` now refuses to start without `JWT_SECRET`, `DATABASE_PASSWORD` and `RABBITMQ_PASSWORD`.
+- All compose files refuse to start without `JWT_SECRET` (and the default and prod files without `DATABASE_PASSWORD` and `RABBITMQ_PASSWORD`). In the `prod` profile the backend also refuses to start with a too-short key or with the example key that used to be published in this repository.
+- PostgreSQL, Redis and RabbitMQ ports are bound to `127.0.0.1` only (Redis has no password).
+- Tokens carry a per-account version: a password reset, or `POST /api/v1/auth/logout-all`, immediately invalidates every token issued before. Tokens issued before this feature existed keep working until then. `/auth/logout` only ends the session in the current browser.
 
 ### 📈 Metrics
 
