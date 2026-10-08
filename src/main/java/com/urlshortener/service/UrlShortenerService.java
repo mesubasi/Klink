@@ -23,6 +23,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -573,6 +576,34 @@ public class UrlShortenerService {
         return urlMappingRepository.findByUserUsername(user.getUsername()).stream()
                 .map(this::buildShortenResponse)
                 .collect(Collectors.toList());
+    }
+
+    private static final int MAX_PAGE_SIZE = 100;
+    private static final java.util.Set<String> SORTABLE_FIELDS = java.util.Set.of("createdAt", "clickCount", "shortCode");
+
+    public PagedResponse<ShortenResponse> searchMyUrls(String query, int page, int size, String sortBy, boolean descending) {
+        UserAccount user = getCurrentAuthenticatedUser();
+        if (user == null) {
+            throw new IllegalArgumentException(messageService.getMessage("user.not_found", "me"));
+        }
+
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        String sortField = SORTABLE_FIELDS.contains(sortBy) ? sortBy : "createdAt";
+        Sort sort = descending ? Sort.by(sortField).descending() : Sort.by(sortField).ascending();
+
+        String trimmed = query == null ? "" : query.trim().toLowerCase();
+        String escaped = trimmed.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        String pattern = "%" + escaped + "%";
+
+        Page<UrlMapping> result = urlMappingRepository.searchByUsername(
+                user.getUsername(), pattern, PageRequest.of(safePage, safeSize, sort));
+
+        List<ShortenResponse> content = result.getContent().stream()
+                .map(this::buildShortenResponse)
+                .collect(Collectors.toList());
+        return new PagedResponse<>(content, result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages());
     }
 
     public ShortenResponse checkHealth(String shortCode) {

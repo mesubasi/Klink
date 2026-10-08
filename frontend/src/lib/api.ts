@@ -1,6 +1,7 @@
 import { 
   ShortenRequest, 
   ShortenResponse, 
+  PagedResponse,
   BulkShortenRequest, 
   BulkShortenResponse, 
   RegisterRequest, 
@@ -132,6 +133,30 @@ export class ApiClient {
 
     if (!res || !res.ok) {
       return [];
+    }
+
+    return await res.json();
+  }
+
+  // 3b. GET /api/v1/urls/my-urls/search (server-side search & pagination)
+  static async searchMyUrls(
+    params: { q?: string; page?: number; size?: number; sortBy?: 'createdAt' | 'clickCount' | 'shortCode'; direction?: 'asc' | 'desc' },
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string } | null
+  ): Promise<PagedResponse<ShortenResponse>> {
+    const query = new URLSearchParams();
+    if (params.q) query.set('q', params.q);
+    query.set('page', String(params.page ?? 0));
+    query.set('size', String(params.size ?? 20));
+    if (params.sortBy) query.set('sortBy', params.sortBy);
+    if (params.direction) query.set('direction', params.direction);
+
+    const res = await this.safeFetch(`${API_BASE_URL}/urls/my-urls/search?${query.toString()}`, {
+      headers: this.getHeaders(lang, authUser || undefined),
+    });
+
+    if (!res || !res.ok) {
+      return { content: [], page: 0, size: params.size ?? 20, totalElements: 0, totalPages: 0 };
     }
 
     return await res.json();

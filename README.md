@@ -144,6 +144,8 @@ mvnw.cmd spring-boot:run
 # Linux / macOS
 ./mvnw spring-boot:run
 ```
+*Note: In `prod` profile the schema is managed by Flyway migrations (`src/main/resources/db/migration`) and Hibernate only validates it. Existing databases are baselined at V1 automatically.*
+
 *Note: In `dev` profile, backend automatically initializes in-memory H2 database (`http://localhost:8080/h2-console`) with seeded test accounts (`admin` / `admin123` and `user` / `password`).*
 
 ### 4. Start Frontend (Next.js)
@@ -187,6 +189,7 @@ Create a `.env` file based on `.env.example`:
 | `POST` | `/api/v1/urls/shorten` | Shorten a single URL with deep-link & security options | Public / User |
 | `POST` | `/api/v1/urls/bulk-shorten` | Batch shorten multiple URLs (up to 50) | User / Admin |
 | `GET` | `/api/v1/urls/my-urls` | Retrieve all shortened URLs for authenticated user | User / Admin |
+| `GET` | `/api/v1/urls/my-urls/search` | Search (`q`) and paginate (`page`, `size` ≤ 100, `sortBy`, `direction`) your links | User / Admin |
 | `GET` | `/api/v1/urls/{shortCode}/analytics` | Comprehensive click telemetry & geo stats | Owner / Admin |
 | `GET` | `/api/v1/urls/{shortCode}/qrcode` | Generate dynamic customized PNG or SVG QR code | Public |
 | `POST` | `/api/v1/urls/qrcode/custom` | Generate standalone custom QR code from any payload | Public |

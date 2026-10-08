@@ -55,6 +55,8 @@ interface MyLinksTableProps {
   onLinkUpdated?: (updated: ShortenResponse) => void;
 }
 
+const PAGE_SIZE = 10;
+
 export const MyLinksTable: React.FC<MyLinksTableProps> = ({
   lang,
   links,
@@ -71,6 +73,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
   const [filterType, setFilterType] = useState<'all' | 'protected' | 'preview' | 'broken'>('all');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [checkingCode, setCheckingCode] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
 
   const getDomainName = (url: string) => {
     try {
@@ -107,6 +110,10 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
       if (filterType === 'broken') return link.healthStatus === 'BROKEN';
       return true;
     });
+
+  const totalPages = Math.max(1, Math.ceil(filteredLinks.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+  const pagedLinks = filteredLinks.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   const handleCopy = (shortUrl: string, shortCode: string) => {
     navigator.clipboard.writeText(shortUrl);
@@ -195,7 +202,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
               <Input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
                 placeholder={t.searchPlaceholder}
                 className="pl-8 h-8 text-xs bg-white"
               />
@@ -236,7 +243,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                 </TableCell>
               </TableRow>
             ) : (
-              filteredLinks.map((link) => {
+              pagedLinks.map((link) => {
                 const domain = getDomainName(link.originalUrl);
                 const clickPercent = Math.min(100, Math.round(((link.clickCount || 0) / maxClicks) * 100));
 
@@ -517,6 +524,21 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
             )}
           </TableBody>
         </Table>
+        {filteredLinks.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100 dark:border-zinc-800">
+            <span className="text-xs text-zinc-500">
+              {currentPage * PAGE_SIZE + 1}-{Math.min((currentPage + 1) * PAGE_SIZE, filteredLinks.length)} / {filteredLinks.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>
+                {lang === 'tr' ? 'Önceki' : 'Previous'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>
+                {lang === 'tr' ? 'Sonraki' : 'Next'}
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
