@@ -1,6 +1,8 @@
 package com.urlshortener.controller;
 
 import com.urlshortener.dto.UserDto;
+import com.urlshortener.model.AuditAction;
+import com.urlshortener.service.AuditService;
 import com.urlshortener.model.UserAccount;
 import com.urlshortener.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,9 +24,11 @@ import java.util.stream.Collectors;
 public class AdminUserController {
 
     private final UserRepository userRepository;
+    private final AuditService auditService;
 
-    public AdminUserController(UserRepository userRepository) {
+    public AdminUserController(UserRepository userRepository, AuditService auditService) {
         this.userRepository = userRepository;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -59,8 +63,10 @@ public class AdminUserController {
             }
         }
 
+        String previousRole = user.getRole();
         user.setRole(targetRole);
         userRepository.save(user);
+        auditService.record(AuditAction.ADMIN_USER_ROLE_CHANGED, "USER", user.getUsername(), null, previousRole + " -> " + targetRole);
 
         return ResponseEntity.ok(toDto(user));
     }
@@ -89,6 +95,7 @@ public class AdminUserController {
         }
 
         userRepository.delete(user);
+        auditService.record(AuditAction.ADMIN_USER_DELETED, "USER", user.getUsername(), null, "role=" + user.getRole() + " email=" + user.getEmail());
         return ResponseEntity.noContent().build();
     }
 

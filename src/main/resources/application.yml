@@ -69,6 +69,8 @@ management:
       application: ${spring.application.name}
 
 app:
+  audit:
+    retention-days: ${AUDIT_RETENTION_DAYS:365}
   mail:
     from: ${MAIL_FROM:}
   seed:

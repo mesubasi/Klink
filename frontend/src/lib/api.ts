@@ -7,6 +7,8 @@ import {
   InvitationPreviewResponse,
   AcceptInvitationResponse,
   CreateCustomerRequest,
+  AuditEventResponse,
+  AuditQuery,
   ProvisionCustomerResponse,
   LinkStatsResponse,
   BulkShortenRequest, 
@@ -1127,6 +1129,41 @@ export class ApiClient {
     }
 
     return await res.json();
+  }
+
+  // 31.10 Audit trail
+  private static auditQueryString(query: AuditQuery): string {
+    const params = new URLSearchParams();
+    if (query.actor) params.set('actor', query.actor);
+    if (query.action) params.set('action', query.action);
+    if (query.outcome) params.set('outcome', query.outcome);
+    if (query.from !== undefined) params.set('from', String(query.from));
+    if (query.to !== undefined) params.set('to', String(query.to));
+    params.set('page', String(query.page ?? 0));
+    params.set('size', String(query.size ?? 25));
+    return params.toString();
+  }
+
+  private static async getAudit(url: string, lang: string, authUser?: { u?: string; p?: string; token?: string }): Promise<PagedResponse<AuditEventResponse>> {
+    const res = await this.safeFetch(url, { headers: this.getHeaders(lang, authUser) });
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Denetim kaydı alınamadı.');
+    }
+    return await res.json();
+  }
+
+  static searchAdminAudit(query: AuditQuery, lang: string = 'tr', authUser?: { u?: string; p?: string; token?: string }) {
+    return this.getAudit(`${API_BASE_URL}/admin/audit?${this.auditQueryString(query)}`, lang, authUser);
+  }
+
+  static searchWorkspaceAudit(workspaceId: string, query: AuditQuery, lang: string = 'tr', authUser?: { u?: string; p?: string; token?: string }) {
+    return this.getAudit(`${API_BASE_URL}/workspaces/${workspaceId}/audit?${this.auditQueryString(query)}`, lang, authUser);
+  }
+
+  static async getAuditActions(lang: string = 'tr', authUser?: { u?: string; p?: string; token?: string }): Promise<string[]> {
+    const res = await this.safeFetch(`${API_BASE_URL}/admin/audit/actions`, { headers: this.getHeaders(lang, authUser) });
+    return res && res.ok ? await res.json() : [];
   }
 
   // 31.9 Email verification and password reset

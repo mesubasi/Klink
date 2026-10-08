@@ -30,6 +30,7 @@ class AuthTokenServiceTest {
     private PasswordEncoder passwordEncoder;
     private EmailService emailService;
     private AuthTokenService service;
+    private com.urlshortener.service.AuditService auditService;
     private UserAccount user;
 
     @BeforeEach
@@ -38,7 +39,8 @@ class AuthTokenServiceTest {
         userRepository = mock(UserRepository.class);
         passwordEncoder = mock(PasswordEncoder.class);
         emailService = mock(EmailService.class);
-        service = new AuthTokenService(tokenRepository, userRepository, passwordEncoder, emailService);
+        auditService = mock(com.urlshortener.service.AuditService.class);
+        service = new AuthTokenService(tokenRepository, userRepository, passwordEncoder, emailService, auditService);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "verifyUrlPattern", "https://app.test/verify/%s");
         org.springframework.test.util.ReflectionTestUtils.setField(service, "resetUrlPattern", "https://app.test/reset/%s");
 

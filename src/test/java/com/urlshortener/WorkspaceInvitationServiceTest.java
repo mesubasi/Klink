@@ -47,6 +47,7 @@ class WorkspaceInvitationServiceTest {
     private WorkspaceService workspaceService;
     private EmailService emailService;
     private WorkspaceInvitationService service;
+    private com.urlshortener.service.AuditService auditService;
 
     private UUID workspaceId;
     private Workspace workspace;
@@ -60,10 +61,11 @@ class WorkspaceInvitationServiceTest {
         userRepository = mock(UserRepository.class);
         workspaceService = mock(WorkspaceService.class);
         emailService = mock(EmailService.class);
+        auditService = mock(com.urlshortener.service.AuditService.class);
 
         service = new WorkspaceInvitationService(invitationRepository, workspaceRepository, memberRepository,
                 userRepository, workspaceService, emailService, mock(com.urlshortener.service.EmailVerificationPolicy.class),
-                mock(com.urlshortener.service.QuotaService.class));
+                mock(com.urlshortener.service.QuotaService.class), auditService);
         ReflectionTestUtils.setField(service, "expiryDays", 7);
         ReflectionTestUtils.setField(service, "inviteUrlPattern", "https://app.test/invite/%s");
 
@@ -73,7 +75,13 @@ class WorkspaceInvitationServiceTest {
 
         when(workspaceService.requireWorkspaceAdmin(workspaceId)).thenReturn(manager);
         when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
-        when(invitationRepository.save(any(WorkspaceInvitation.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(invitationRepository.save(any(WorkspaceInvitation.class))).thenAnswer(inv -> {
+            WorkspaceInvitation saved = inv.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(UUID.randomUUID());
+            }
+            return saved;
+        });
     }
 
     @AfterEach
@@ -89,6 +97,7 @@ class WorkspaceInvitationServiceTest {
 
     private WorkspaceInvitation pendingFor(String email, String rawTokenHash) {
         WorkspaceInvitation i = new WorkspaceInvitation();
+        i.setId(UUID.randomUUID());
         i.setWorkspace(workspace);
         i.setEmail(email);
         i.setRole(WorkspaceRole.VIEWER);
@@ -240,5 +249,34 @@ class WorkspaceInvitationServiceTest {
         assertEquals("yeni@a.com", preview.getEmail());
         assertEquals(WorkspaceRole.VIEWER, preview.getRole());
         assertEquals("mudur", preview.getInvitedBy());
+    }
+
+    @Test
+    void invitationLifecycleLeavesAnAuditTrail() {
+        when(userRepository.findByEmail("yeni@a.com")).thenReturn(Optional.empty());
+        when(invitationRepository.findByWorkspaceIdAndEmailAndStatus(any(), anyString(), any())).thenReturn(List.of());
+        service.invite(workspaceId, new AddWorkspaceMemberRequest("yeni@a.com", WorkspaceRole.VIEWER));
+        verify(auditService).record(eq(com.urlshortener.model.AuditAction.INVITATION_SENT), eq("INVITATION"), anyString(), eq(workspaceId),
+                org.mockito.ArgumentMatchers.contains("email=yeni@a.com role=VIEWER"));
+
+        UserAccount invitee = UserAccount.builder().id(UUID.randomUUID()).username("yeni").email("yeni@a.com").build();
+        loginAs(invitee);
+        WorkspaceInvitation invitation = pendingFor("yeni@a.com", "h");
+        when(invitationRepository.findByTokenHashForUpdate(anyString())).thenReturn(Optional.of(invitation));
+        service.accept("tok");
+        verify(auditService).record(eq(com.urlshortener.model.AuditAction.INVITATION_ACCEPTED), eq("INVITATION"), anyString(), eq(workspaceId),
+                org.mockito.ArgumentMatchers.contains("user=yeni"));
+    }
+
+    @Test
+    void acceptingSomeoneElsesInvitationIsRecordedAsDenied() {
+        UserAccount other = UserAccount.builder().id(UUID.randomUUID()).username("baska").email("baska@x.com").build();
+        loginAs(other);
+        when(invitationRepository.findByTokenHashForUpdate(anyString())).thenReturn(Optional.of(pendingFor("yeni@a.com", "h")));
+
+        assertThrows(SecurityException.class, () -> service.accept("tok"));
+
+        verify(auditService).denied(anyString(), eq("INVITATION"), anyString(), eq(workspaceId));
+        verify(auditService, never()).record(eq(com.urlshortener.model.AuditAction.INVITATION_ACCEPTED), any(), any(), any(), any());
     }
 }

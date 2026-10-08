@@ -3,6 +3,7 @@ package com.urlshortener;
 import com.urlshortener.model.UserAccount;
 import com.urlshortener.repository.UserRepository;
 import com.urlshortener.service.AuthService;
+import com.urlshortener.service.AuditService;
 import com.urlshortener.service.AuthTokenService;
 import com.urlshortener.service.MessageService;
 import org.junit.jupiter.api.Test;
@@ -19,8 +20,9 @@ class LogoutEverywhereTest {
     void bumpsTheVersionAndSavesTheAccount() {
         UserRepository userRepository = mock(UserRepository.class);
         UserAccount user = UserAccount.builder().username("ayse").build();
+        AuditService audit = mock(AuditService.class);
         when(userRepository.findByUsername("ayse")).thenReturn(Optional.of(user));
-        AuthService service = new AuthService(userRepository, null, mock(MessageService.class), null, null, null, mock(AuthTokenService.class));
+        AuthService service = new AuthService(userRepository, null, mock(MessageService.class), null, null, null, mock(AuthTokenService.class), audit);
 
         service.logoutEverywhere("ayse");
 
@@ -32,7 +34,7 @@ class LogoutEverywhereTest {
     void unknownUserIsAnError() {
         UserRepository userRepository = mock(UserRepository.class);
         when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
-        AuthService service = new AuthService(userRepository, null, mock(MessageService.class), null, null, null, mock(AuthTokenService.class));
+        AuthService service = new AuthService(userRepository, null, mock(MessageService.class), null, null, null, mock(AuthTokenService.class), mock(AuditService.class));
 
         assertThrows(IllegalArgumentException.class, () -> service.logoutEverywhere("ghost"));
     }

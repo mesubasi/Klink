@@ -59,6 +59,9 @@ public class WorkspacePermissionServiceTest {
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
+    @Mock
+    private com.urlshortener.service.AuditService auditService;
+
     @InjectMocks
     private WorkspacePermissionService permissionService;
 

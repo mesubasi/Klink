@@ -4,6 +4,7 @@ import com.urlshortener.dto.ApiKeyActionRequest;
 import com.urlshortener.dto.ApiKeyApplyRequest;
 import com.urlshortener.dto.ApiKeyResponse;
 import com.urlshortener.model.ApiKey;
+import com.urlshortener.model.AuditAction;
 import com.urlshortener.model.ApiKeyStatus;
 import com.urlshortener.model.UserAccount;
 import com.urlshortener.repository.ApiKeyRepository;
@@ -31,8 +32,10 @@ public class ApiKeyService {
 
     private final ApiKeyRepository apiKeyRepository;
     private final UserRepository userRepository;
+    private final AuditService auditService;
 
-    public ApiKeyService(ApiKeyRepository apiKeyRepository, UserRepository userRepository) {
+    public ApiKeyService(ApiKeyRepository apiKeyRepository, UserRepository userRepository, AuditService auditService) {
+        this.auditService = auditService;
         this.apiKeyRepository = apiKeyRepository;
         this.userRepository = userRepository;
     }
@@ -111,6 +114,8 @@ public class ApiKeyService {
         apiKey.setRejectionReason(null);
 
         ApiKey updated = apiKeyRepository.save(apiKey);
+        auditService.record(AuditAction.ADMIN_API_KEY_DECISION, "API_KEY", updated.getId().toString(), null,
+                "approved app=" + updated.getAppName() + " owner=" + updated.getUser().getUsername() + " rateLimit=" + rateLimit);
         log.info("✅ API Key başvurusu onaylandı: ID: {}, App: {}, User: {}", updated.getId(), updated.getAppName(), updated.getUser().getUsername());
         return toResponse(updated);
     }
@@ -130,6 +135,8 @@ public class ApiKeyService {
         apiKey.setKeyHash(null);
 
         ApiKey updated = apiKeyRepository.save(apiKey);
+        auditService.record(AuditAction.ADMIN_API_KEY_DECISION, "API_KEY", updated.getId().toString(), null,
+                "rejected app=" + updated.getAppName() + " owner=" + updated.getUser().getUsername());
         log.info("❌ API Key başvurusu reddedildi: ID: {}, Sebep: {}", updated.getId(), reason);
         return toResponse(updated);
     }
@@ -141,6 +148,8 @@ public class ApiKeyService {
 
         apiKey.setStatus(ApiKeyStatus.REVOKED);
         ApiKey updated = apiKeyRepository.save(apiKey);
+        auditService.record(AuditAction.ADMIN_API_KEY_DECISION, "API_KEY", updated.getId().toString(), null,
+                "revoked app=" + updated.getAppName() + " owner=" + updated.getUser().getUsername());
         log.info("🚫 API Key iptal edildi (REVOKED): ID: {}", updated.getId());
         return toResponse(updated);
     }

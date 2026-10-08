@@ -1,5 +1,6 @@
 package com.urlshortener.service;
 
+import com.urlshortener.model.AuditAction;
 import com.urlshortener.model.AuthToken;
 import com.urlshortener.model.AuthTokenType;
 import com.urlshortener.model.UserAccount;
@@ -31,6 +32,7 @@ public class AuthTokenService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final AuditService auditService;
 
     @Value("${app.frontend.verify-url:http://localhost:3000/verify-email/%s}")
     private String verifyUrlPattern;
@@ -39,7 +41,8 @@ public class AuthTokenService {
     private String resetUrlPattern;
 
     public AuthTokenService(AuthTokenRepository tokenRepository, UserRepository userRepository,
-                            PasswordEncoder passwordEncoder, EmailService emailService) {
+                            PasswordEncoder passwordEncoder, EmailService emailService, AuditService auditService) {
+        this.auditService = auditService;
         this.tokenRepository = tokenRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -68,6 +71,7 @@ public class AuthTokenService {
         userRepository.save(user);
         stored.setUsedAt(System.currentTimeMillis());
         tokenRepository.save(stored);
+        auditService.recordAs(user.getUsername(), user.getRole(), AuditAction.EMAIL_VERIFIED, AuditService.SUCCESS, "USER", user.getUsername(), null, null);
         log.info("E-posta doğrulandı: {}", user.getUsername());
     }
 
@@ -89,6 +93,7 @@ public class AuthTokenService {
             return;
         }
         String token = issue(user, AuthTokenType.PASSWORD_RESET, RESET_TTL_MS);
+        auditService.recordAs(user.getUsername(), user.getRole(), AuditAction.PASSWORD_RESET_REQUESTED, AuditService.SUCCESS, "USER", user.getUsername(), null, null);
         emailService.sendPasswordReset(user.getEmail(), user.getUsername(), String.format(resetUrlPattern, token));
     }
 
@@ -107,6 +112,7 @@ public class AuthTokenService {
         stored.setUsedAt(now);
         tokenRepository.save(stored);
         tokenRepository.invalidateOpenTokens(user.getId(), AuthTokenType.PASSWORD_RESET, now);
+        auditService.recordAs(user.getUsername(), user.getRole(), AuditAction.PASSWORD_RESET_COMPLETED, AuditService.SUCCESS, "USER", user.getUsername(), null, "all earlier sessions revoked");
         log.info("Parola sıfırlandı: {}", user.getUsername());
     }
 

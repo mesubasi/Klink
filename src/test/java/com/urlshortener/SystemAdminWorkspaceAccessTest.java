@@ -22,6 +22,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /** Platform operators (ROLE_ADMIN) must be able to support any customer workspace without being a member. */
@@ -32,6 +36,7 @@ class SystemAdminWorkspaceAccessTest {
     private UserRepository userRepository;
     private WorkspaceService service;
     private com.urlshortener.service.QuotaService quotaService;
+    private com.urlshortener.service.AuditService auditService;
 
     private UUID workspaceId;
     private Workspace workspace;
@@ -43,8 +48,9 @@ class SystemAdminWorkspaceAccessTest {
         memberRepository = mock(WorkspaceMemberRepository.class);
         userRepository = mock(UserRepository.class);
         quotaService = mock(com.urlshortener.service.QuotaService.class);
+        auditService = mock(com.urlshortener.service.AuditService.class);
         service = new WorkspaceService(workspaceRepository, memberRepository, userRepository, mock(UrlMappingRepository.class),
-                quotaService, mock(com.urlshortener.service.EmailVerificationPolicy.class));
+                quotaService, mock(com.urlshortener.service.EmailVerificationPolicy.class), auditService);
 
         workspaceId = UUID.randomUUID();
         customerManager = UserAccount.builder().id(UUID.randomUUID()).username("mudur").email("mudur@a.com").build();
@@ -160,7 +166,11 @@ class SystemAdminWorkspaceAccessTest {
 
         UserAccount root = loginAs("root", "ROLE_ADMIN");
         when(workspaceRepository.existsBySlug(org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
-        when(workspaceRepository.save(org.mockito.ArgumentMatchers.any(Workspace.class))).thenAnswer(i -> i.getArgument(0));
+        when(workspaceRepository.save(org.mockito.ArgumentMatchers.any(Workspace.class))).thenAnswer(i -> {
+            Workspace w = i.getArgument(0);
+            w.setId(UUID.randomUUID());
+            return w;
+        });
 
         Workspace created = service.createCustomerWorkspace("  B Firması ", "  ", 10, null);
 
@@ -169,5 +179,78 @@ class SystemAdminWorkspaceAccessTest {
         assertNull(created.getDescription());
         assertEquals(10, created.getMaxMembers());
         verify(quotaService).applyDefaults(created);
+    }
+
+    @Test
+    void readingACustomersWorkspaceWithoutBeingAMemberIsAudited() {
+        loginAs("root", "ROLE_ADMIN");
+        when(memberRepository.findByWorkspaceIdAndUserUsername(workspaceId, "root")).thenReturn(Optional.empty());
+        when(memberRepository.existsByWorkspaceIdAndUserUsername(workspaceId, "root")).thenReturn(false);
+
+        service.getWorkspaceDetails(workspaceId);
+        service.getWorkspaceUrls(workspaceId);
+
+        verify(auditService).record(com.urlshortener.model.AuditAction.ADMIN_VIEWED_WORKSPACE, "WORKSPACE", workspaceId.toString(), workspaceId, "name=A Firması");
+        verify(auditService).record(com.urlshortener.model.AuditAction.ADMIN_VIEWED_WORKSPACE_LINKS, "WORKSPACE", workspaceId.toString(), workspaceId, null);
+    }
+
+    @Test
+    void aPlatformAdminWhoBelongsToTheWorkspaceIsNotAuditedForReading() {
+        UserAccount root = loginAs("root", "ROLE_ADMIN");
+        when(memberRepository.findByWorkspaceIdAndUserUsername(workspaceId, "root")).thenReturn(Optional.of(
+                WorkspaceMember.builder().workspace(workspace).user(root).role(WorkspaceRole.ADMIN).build()));
+        when(memberRepository.existsByWorkspaceIdAndUserUsername(workspaceId, "root")).thenReturn(true);
+
+        service.getWorkspaceDetails(workspaceId);
+        service.getWorkspaceUrls(workspaceId);
+
+        verify(auditService, never()).record(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void outsidersAreRecordedAsDeniedWhenTheyTryToManageOrReadAWorkspace() {
+        UserAccount outsider = loginAs("dis", "ROLE_USER");
+        when(memberRepository.findByWorkspaceIdAndUserId(workspaceId, outsider.getId())).thenReturn(Optional.empty());
+        when(memberRepository.findByWorkspaceIdAndUserUsername(workspaceId, "dis")).thenReturn(Optional.empty());
+
+        assertThrows(SecurityException.class, () -> service.requireWorkspaceAdmin(workspaceId));
+        assertThrows(SecurityException.class, () -> service.getWorkspaceDetails(workspaceId));
+        assertThrows(SecurityException.class, () -> service.getWorkspaceUrls(workspaceId));
+
+        verify(auditService, times(3)).denied(anyString(), eq("WORKSPACE"), eq(workspaceId.toString()), eq(workspaceId));
+    }
+
+    @Test
+    void quotaChangesAndCustomerCreationAreAudited() {
+        loginAs("root", "ROLE_ADMIN");
+        when(workspaceRepository.save(workspace)).thenReturn(workspace);
+        service.updateQuota(workspaceId, 25, 0);
+        verify(auditService).record(eq(com.urlshortener.model.AuditAction.QUOTA_UPDATED), eq("WORKSPACE"), eq(workspaceId.toString()),
+                eq(workspaceId), contains("maxMembers=25 maxLinks=null"));
+
+        when(workspaceRepository.existsBySlug(anyString())).thenReturn(false);
+        when(workspaceRepository.save(any(Workspace.class))).thenAnswer(i -> {
+            Workspace w = i.getArgument(0);
+            w.setId(UUID.randomUUID());
+            return w;
+        });
+        service.createCustomerWorkspace("Globex", null, 3, 10);
+        verify(auditService).record(eq(com.urlshortener.model.AuditAction.CUSTOMER_CREATED), eq("WORKSPACE"), anyString(), any(UUID.class),
+                contains("name=Globex maxMembers=3 maxLinks=10"));
+    }
+
+    @Test
+    void removingAMemberAsAnOutsidePlatformAdminIsFlagged() {
+        loginAs("root", "ROLE_ADMIN");
+        UUID employeeId = UUID.randomUUID();
+        UserAccount employee = UserAccount.builder().id(employeeId).username("ahmet").build();
+        WorkspaceMember membership = WorkspaceMember.builder().workspace(workspace).user(employee).role(WorkspaceRole.MEMBER).build();
+        when(memberRepository.findByWorkspaceIdAndUserId(workspaceId, employeeId)).thenReturn(Optional.of(membership));
+        when(memberRepository.existsByWorkspaceIdAndUserUsername(workspaceId, "root")).thenReturn(false);
+
+        service.removeMember(workspaceId, employeeId);
+
+        verify(auditService).record(eq(com.urlshortener.model.AuditAction.MEMBER_REMOVED), eq("USER"), eq("ahmet"), eq(workspaceId),
+                contains("[platform admin, not a member]"));
     }
 }
