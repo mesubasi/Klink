@@ -106,6 +106,26 @@ public class WorkspaceService {
         }).collect(Collectors.toList());
     }
 
+    /** Platform-wide customer overview for system admins. */
+    @Transactional(readOnly = true)
+    public List<WorkspaceResponse> getAllWorkspaces() {
+        if (!isSystemAdmin()) {
+            throw new SecurityException("Bu işlem için sistem yöneticisi yetkisi gereklidir.");
+        }
+        return workspaceRepository.findAll().stream().map(w -> WorkspaceResponse.builder()
+                .id(w.getId())
+                .name(w.getName())
+                .description(w.getDescription())
+                .slug(w.getSlug())
+                .ownerUsername(w.getOwner().getUsername())
+                .memberCount(workspaceMemberRepository.countByWorkspaceId(w.getId()))
+                .linkCount(urlMappingRepository.countByWorkspaceId(w.getId()))
+                .createdAt(w.getCreatedAt())
+                .build())
+                .sorted(Comparator.comparing(WorkspaceResponse::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .collect(Collectors.toList());
+    }
+
     @Transactional(readOnly = true)
     public WorkspaceResponse getWorkspaceDetails(UUID workspaceId) {
         UserAccount currentUser = getCurrentAuthenticatedUser();
@@ -113,8 +133,14 @@ public class WorkspaceService {
         Workspace workspace = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> new IllegalArgumentException("Çalışma alanı bulunamadı."));
 
-        WorkspaceMember userMembership = workspaceMemberRepository.findByWorkspaceIdAndUserUsername(workspaceId, currentUser.getUsername())
-                .orElseThrow(() -> new SecurityException("Bu çalışma alanına erişim yetkiniz bulunmamaktadır."));
+        WorkspaceRole currentRole = workspaceMemberRepository.findByWorkspaceIdAndUserUsername(workspaceId, currentUser.getUsername())
+                .map(WorkspaceMember::getRole)
+                .orElseGet(() -> {
+                    if (isSystemAdmin()) {
+                        return WorkspaceRole.ADMIN;
+                    }
+                    throw new SecurityException("Bu çalışma alanına erişim yetkiniz bulunmamaktadır.");
+                });
 
         List<WorkspaceMember> allMembers = workspaceMemberRepository.findByWorkspaceId(workspaceId);
         List<WorkspaceMemberResponse> memberResponses = allMembers.stream().map(this::buildMemberResponse).collect(Collectors.toList());
@@ -127,7 +153,7 @@ public class WorkspaceService {
                 .description(workspace.getDescription())
                 .slug(workspace.getSlug())
                 .ownerUsername(workspace.getOwner().getUsername())
-                .currentUserRole(userMembership.getRole())
+                .currentUserRole(currentRole)
                 .memberCount(allMembers.size())
                 .linkCount(linkCount)
                 .createdAt(workspace.getCreatedAt())
@@ -191,13 +217,15 @@ public class WorkspaceService {
     public void removeMember(UUID workspaceId, UUID userId) {
         UserAccount currentUser = getCurrentAuthenticatedUser();
 
-        WorkspaceMember callerMembership = workspaceMemberRepository.findByWorkspaceIdAndUserUsername(workspaceId, currentUser.getUsername())
-                .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
-
         boolean isSelfLeaving = currentUser.getId().equals(userId);
 
-        if (!isSelfLeaving && callerMembership.getRole() != WorkspaceRole.ADMIN) {
-            throw new SecurityException("Üye çıkarmak için Çalışma Alanı Yöneticisi (WORKSPACE_ADMIN) yetkisi gereklidir.");
+        if (!isSystemAdmin()) {
+            WorkspaceMember callerMembership = workspaceMemberRepository.findByWorkspaceIdAndUserUsername(workspaceId, currentUser.getUsername())
+                    .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
+
+            if (!isSelfLeaving && callerMembership.getRole() != WorkspaceRole.ADMIN) {
+                throw new SecurityException("Üye çıkarmak için Çalışma Alanı Yöneticisi (WORKSPACE_ADMIN) yetkisi gereklidir.");
+            }
         }
 
         WorkspaceMember targetMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
@@ -219,8 +247,10 @@ public class WorkspaceService {
         UserAccount currentUser = getCurrentAuthenticatedUser();
 
         // Çalışma alanına üyelik kontrolü (Admin, Member veya Viewer olabilir)
-        workspaceMemberRepository.findByWorkspaceIdAndUserUsername(workspaceId, currentUser.getUsername())
-                .orElseThrow(() -> new SecurityException("Bu çalışma alanının linklerini görüntüleme yetkiniz bulunmamaktadır."));
+        if (!isSystemAdmin()) {
+            workspaceMemberRepository.findByWorkspaceIdAndUserUsername(workspaceId, currentUser.getUsername())
+                    .orElseThrow(() -> new SecurityException("Bu çalışma alanının linklerini görüntüleme yetkiniz bulunmamaktadır."));
+        }
 
         List<UrlMapping> mappings = urlMappingRepository.findByWorkspaceId(workspaceId);
 
@@ -252,18 +282,35 @@ public class WorkspaceService {
         }).collect(Collectors.toList());
     }
 
-    private WorkspaceMember requireAdminRole(UUID workspaceId, UserAccount user) {
+    private boolean isSystemAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isSystemSuperAdmin = auth != null && auth.getAuthorities().stream()
+        return auth != null && auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    }
+
+    /** Verifies the current caller may manage the workspace and returns them. */
+    @Transactional(readOnly = true)
+    public UserAccount requireWorkspaceAdmin(UUID workspaceId) {
+        UserAccount currentUser = getCurrentAuthenticatedUser();
+        requireAdminRole(workspaceId, currentUser);
+        return currentUser;
+    }
+
+    /** Workspace admins can manage their workspace; system admins can manage any workspace without being a member. */
+    private void requireAdminRole(UUID workspaceId, UserAccount user) {
+        if (isSystemAdmin()) {
+            if (!workspaceRepository.existsById(workspaceId)) {
+                throw new IllegalArgumentException("Çalışma alanı bulunamadı.");
+            }
+            return;
+        }
 
         WorkspaceMember member = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, user.getId())
                 .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
 
-        if (!isSystemSuperAdmin && member.getRole() != WorkspaceRole.ADMIN) {
+        if (member.getRole() != WorkspaceRole.ADMIN) {
             throw new SecurityException("Bu işlem için Çalışma Alanı Yöneticisi (WORKSPACE_ADMIN) yetkisi gereklidir.");
         }
-        return member;
     }
 
     private WorkspaceMemberResponse buildMemberResponse(WorkspaceMember member) {

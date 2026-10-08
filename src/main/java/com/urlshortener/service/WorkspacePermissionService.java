@@ -229,17 +229,34 @@ public class WorkspacePermissionService {
         );
     }
 
-    private void requireAdminRole(UUID workspaceId, UserAccount user) {
+    private boolean isSystemAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isSystemSuperAdmin = auth != null && auth.getAuthorities().stream()
+        return auth != null && auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    }
+
+    private void requireAdminRole(UUID workspaceId, UserAccount user) {
+        if (isSystemAdmin()) {
+            return;
+        }
 
         WorkspaceMember member = memberRepository.findByWorkspaceIdAndUserId(workspaceId, user.getId())
                 .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
 
-        if (!isSystemSuperAdmin && member.getRole() != WorkspaceRole.ADMIN) {
+        if (member.getRole() != WorkspaceRole.ADMIN) {
             throw new SecurityException("İzin matrisini yönetmek için Çalışma Alanı Yöneticisi (WORKSPACE_ADMIN) yetkisi gereklidir.");
         }
+    }
+
+    /** Matrix lookup for API callers: only workspace members and system admins may read a workspace's permissions. */
+    @Transactional(readOnly = true)
+    public WorkspacePermissionMatrixResponse getPermissionMatrixForCurrentUser(UUID workspaceId) {
+        if (!isSystemAdmin()) {
+            UserAccount currentUser = getCurrentAuthenticatedUser();
+            memberRepository.findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
+                    .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
+        }
+        return getPermissionMatrix(workspaceId);
     }
 
     private UserAccount getCurrentAuthenticatedUser() {
