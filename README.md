@@ -201,6 +201,20 @@ Create a `.env` file based on `.env.example`:
 | `POST` | `/api/v1/api-keys/apply` | Apply for a developer API key | User / Admin |
 | `POST` | `/api/v1/auth/2fa/setup` | Initialize TOTP 2FA secret and QR code | User / Admin |
 
+### 🔐 Workspace Roles & Permissions
+
+Each workspace has three roles. The workspace `ADMIN` (the creator, e.g. a manager) can add members, change their roles and edit the permission matrix for `MEMBER` and `VIEWER` from the dashboard. System admins (`ROLE_ADMIN`) can do everything.
+
+| Permission | Enforced on |
+| :--- | :--- |
+| `canCreateLink` | Creating workspace links, toggling link status, A/B test configuration |
+| `canDeleteLink` | Deleting a link |
+| `canViewAnalytics` | Link analytics and summary, on-demand health check |
+| `canExportReports` | CSV/PDF export and emailed reports |
+| `canManageWebhooks` | Setting a webhook when creating a workspace link |
+
+Permissions follow the role, not link ownership: a member who created a link is still bound by the matrix, and someone removed from the workspace loses access to its links. Personal links (no workspace) are limited to their owner. `canCustomizeQr` is stored but not enforced, because QR images are public. Denied requests return `403`.
+
 ### 📈 Metrics
 
 Prometheus metrics are exposed at `/actuator/prometheus` and require an admin JWT (`Authorization: Bearer <token>`):

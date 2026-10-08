@@ -47,6 +47,9 @@ class AbTestServiceTest {
     private WorkspaceMemberRepository workspaceMemberRepository;
 
     @Mock
+    private com.urlshortener.service.WorkspacePermissionService workspacePermissionService;
+
+    @Mock
     private RedisTemplate<String, Object> redisTemplate;
 
     @InjectMocks
@@ -65,6 +68,8 @@ class AbTestServiceTest {
                 .user(testUser)
                 .abTestingEnabled(false)
                 .build();
+
+        lenient().when(workspacePermissionService.hasLinkPermission(any(), eq("canCreateLink"))).thenReturn(true);
 
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 "testuser", null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
