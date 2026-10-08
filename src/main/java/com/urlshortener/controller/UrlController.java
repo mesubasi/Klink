@@ -134,14 +134,21 @@ public class UrlController {
     }
 
     @GetMapping("/api/v1/urls/my-urls/search")
-    @Operation(summary = "Kullanıcının Linklerini Ara ve Sayfala", description = "Kısa kod veya hedef URL içinde arama yapar; sayfalama ve sıralama destekler (size en fazla 100).")
+    @Operation(summary = "Kullanıcının Linklerini Ara ve Sayfala", description = "Kısa kod veya hedef URL içinde arama yapar; filter (ALL, PROTECTED, PREVIEW, BROKEN), sayfalama ve sıralama destekler (size en fazla 100).")
     public ResponseEntity<PagedResponse<ShortenResponse>> searchMyUrls(
             @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "ALL") String filter,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String direction) {
-        return ResponseEntity.ok(urlShortenerService.searchMyUrls(q, page, size, sortBy, !"asc".equalsIgnoreCase(direction)));
+        return ResponseEntity.ok(urlShortenerService.searchMyUrls(q, filter, page, size, sortBy, !"asc".equalsIgnoreCase(direction)));
+    }
+
+    @GetMapping("/api/v1/urls/my-urls/stats")
+    @Operation(summary = "Kullanıcı Link İstatistikleri", description = "Toplam link, toplam tıklama, şifreli, kırık ve sağlıklı link sayılarını döner.")
+    public ResponseEntity<LinkStatsResponse> getMyUrlStats() {
+        return ResponseEntity.ok(urlShortenerService.getMyUrlStats());
     }
 
     @PostMapping("/api/v1/urls/{shortCode}/health-check")

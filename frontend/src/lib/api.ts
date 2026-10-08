@@ -2,6 +2,7 @@ import {
   ShortenRequest, 
   ShortenResponse, 
   PagedResponse,
+  LinkStatsResponse,
   BulkShortenRequest, 
   BulkShortenResponse, 
   RegisterRequest, 
@@ -140,12 +141,13 @@ export class ApiClient {
 
   // 3b. GET /api/v1/urls/my-urls/search (server-side search & pagination)
   static async searchMyUrls(
-    params: { q?: string; page?: number; size?: number; sortBy?: 'createdAt' | 'clickCount' | 'shortCode'; direction?: 'asc' | 'desc' },
+    params: { q?: string; filter?: 'ALL' | 'PROTECTED' | 'PREVIEW' | 'BROKEN'; page?: number; size?: number; sortBy?: 'createdAt' | 'clickCount' | 'shortCode'; direction?: 'asc' | 'desc' },
     lang: string = 'tr',
     authUser?: { u?: string; p?: string; token?: string } | null
   ): Promise<PagedResponse<ShortenResponse>> {
     const query = new URLSearchParams();
     if (params.q) query.set('q', params.q);
+    if (params.filter) query.set('filter', params.filter);
     query.set('page', String(params.page ?? 0));
     query.set('size', String(params.size ?? 20));
     if (params.sortBy) query.set('sortBy', params.sortBy);
@@ -157,6 +159,22 @@ export class ApiClient {
 
     if (!res || !res.ok) {
       return { content: [], page: 0, size: params.size ?? 20, totalElements: 0, totalPages: 0 };
+    }
+
+    return await res.json();
+  }
+
+  // 3c. GET /api/v1/urls/my-urls/stats
+  static async getMyUrlStats(
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string } | null
+  ): Promise<LinkStatsResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/urls/my-urls/stats`, {
+      headers: this.getHeaders(lang, authUser || undefined),
+    });
+
+    if (!res || !res.ok) {
+      return { totalLinks: 0, totalClicks: 0, protectedCount: 0, brokenCount: 0, healthyCount: 0 };
     }
 
     return await res.json();

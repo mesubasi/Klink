@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Search, 
   Lock, 
@@ -45,7 +45,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 
 interface MyLinksTableProps {
   lang: Language;
-  links: ShortenResponse[];
+  refreshKey: number;
+  brokenCount?: number;
   authUser?: { u?: string; p?: string; token?: string } | null;
   onToggleStatus: (shortCode: string, currentActive: boolean) => void;
   onOpenQr: (shortCode: string) => void;
@@ -59,7 +60,8 @@ const PAGE_SIZE = 10;
 
 export const MyLinksTable: React.FC<MyLinksTableProps> = ({
   lang,
-  links,
+  refreshKey,
+  brokenCount = 0,
   authUser,
   onOpenQr,
   onOpenPasswordModal,
@@ -74,6 +76,55 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [checkingCode, setCheckingCode] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [links, setLinks] = useState<ShortenResponse[]>([]);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const result = await ApiClient.searchMyUrls(
+          {
+            q: debouncedQuery,
+            filter: filterType.toUpperCase() as 'ALL' | 'PROTECTED' | 'PREVIEW' | 'BROKEN',
+            page,
+            size: PAGE_SIZE,
+          },
+          lang,
+          authUser
+        );
+        if (cancelled) return;
+        // The last page may disappear after a delete; step back to the new last page.
+        if (result.content.length === 0 && page > 0 && result.totalPages > 0) {
+          setPage(result.totalPages - 1);
+          return;
+        }
+        setLinks(result.content);
+        setTotalElements(result.totalElements);
+        setTotalPages(Math.max(1, result.totalPages));
+      } catch (err) {
+        console.error('Failed to load links:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQuery, filterType, page, refreshKey, authUser, lang]);
 
   const getDomainName = (url: string) => {
     try {
@@ -88,6 +139,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
     setCheckingCode(shortCode);
     try {
       const updated = await ApiClient.checkLinkHealth(shortCode, lang, authUser);
+      setLinks((prev) => prev.map((l) => (l.shortCode === updated.shortCode ? updated : l)));
       if (onLinkUpdated) {
         onLinkUpdated(updated);
       }
@@ -98,22 +150,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
     }
   };
 
-  const filteredLinks = links
-    .filter((link) => {
-      const matchesSearch =
-        link.shortCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        link.originalUrl.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      if (!matchesSearch) return false;
-      if (filterType === 'protected') return !!link.passwordProtected;
-      if (filterType === 'preview') return !!link.previewEnabled;
-      if (filterType === 'broken') return link.healthStatus === 'BROKEN';
-      return true;
-    });
-
-  const totalPages = Math.max(1, Math.ceil(filteredLinks.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
-  const pagedLinks = filteredLinks.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   const handleCopy = (shortUrl: string, shortCode: string) => {
     navigator.clipboard.writeText(shortUrl);
@@ -122,7 +159,6 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
   };
 
   const maxClicks = Math.max(...links.map((l) => l.clickCount || 0), 1);
-  const brokenCount = links.filter((l) => l.healthStatus === 'BROKEN').length;
 
   return (
     <Card className="border-zinc-200/90 shadow-sm overflow-hidden">
@@ -132,7 +168,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
             <div className="flex items-center gap-2">
               <CardTitle className="text-base font-bold text-zinc-950">{t.myLinksTitle}</CardTitle>
               <Badge variant="secondary" className="font-mono text-xs">
-                {filteredLinks.length}
+                {totalElements}
               </Badge>
               {brokenCount > 0 && (
                 <Badge variant="destructive" className="font-mono text-[11px] gap-1 animate-pulse">
@@ -152,7 +188,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
             <div className="flex items-center p-0.5 rounded-lg bg-zinc-100 border border-zinc-200/80 text-[11px] font-semibold">
               <button
                 type="button"
-                onClick={() => setFilterType('all')}
+                onClick={() => { setFilterType('all'); setPage(0); }}
                 className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   filterType === 'all' ? 'bg-white text-zinc-950 shadow-2xs font-bold' : 'text-zinc-500 hover:text-zinc-900'
                 }`}
@@ -161,7 +197,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setFilterType('protected')}
+                onClick={() => { setFilterType('protected'); setPage(0); }}
                 className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   filterType === 'protected' ? 'bg-white text-zinc-950 shadow-2xs font-bold' : 'text-zinc-500 hover:text-zinc-900'
                 }`}
@@ -170,7 +206,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setFilterType('preview')}
+                onClick={() => { setFilterType('preview'); setPage(0); }}
                 className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   filterType === 'preview' ? 'bg-white text-zinc-950 shadow-2xs font-bold' : 'text-zinc-500 hover:text-zinc-900'
                 }`}
@@ -179,7 +215,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setFilterType('broken')}
+                onClick={() => { setFilterType('broken'); setPage(0); }}
                 className={`px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
                   filterType === 'broken' 
                     ? 'bg-red-600 text-white shadow-2xs font-bold' 
@@ -202,7 +238,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
               <Input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.searchPlaceholder}
                 className="pl-8 h-8 text-xs bg-white"
               />
@@ -224,7 +260,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredLinks.length === 0 ? (
+            {links.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-32 text-center text-zinc-400 font-medium">
                   <div className="flex flex-col items-center justify-center space-y-2">
@@ -243,7 +279,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                 </TableCell>
               </TableRow>
             ) : (
-              pagedLinks.map((link) => {
+              links.map((link) => {
                 const domain = getDomainName(link.originalUrl);
                 const clickPercent = Math.min(100, Math.round(((link.clickCount || 0) / maxClicks) * 100));
 
@@ -524,16 +560,16 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
             )}
           </TableBody>
         </Table>
-        {filteredLinks.length > PAGE_SIZE && (
+        {totalElements > PAGE_SIZE && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100 dark:border-zinc-800">
             <span className="text-xs text-zinc-500">
-              {currentPage * PAGE_SIZE + 1}-{Math.min((currentPage + 1) * PAGE_SIZE, filteredLinks.length)} / {filteredLinks.length}
+              {currentPage * PAGE_SIZE + 1}-{Math.min((currentPage + 1) * PAGE_SIZE, totalElements)} / {totalElements}
             </span>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>
+              <Button variant="outline" size="sm" disabled={loading || currentPage === 0} onClick={() => setPage(currentPage - 1)}>
                 {lang === 'tr' ? 'Önceki' : 'Previous'}
               </Button>
-              <Button variant="outline" size="sm" disabled={currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>
+              <Button variant="outline" size="sm" disabled={loading || currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>
                 {lang === 'tr' ? 'Sonraki' : 'Next'}
               </Button>
             </div>
