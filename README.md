@@ -20,7 +20,7 @@ Built with **Spring Boot 3 (Java 17/21)**, **Redis In-Memory Cache**, **RabbitMQ
 ## 🌟 Key Capabilities & Feature Matrix
 
 ### 🚀 1. Intelligent URL Shortening & Routing
-- **Sub-2ms Redirections**: High-speed in-memory Redis caching avoids database trips on hot paths for instantaneous HTTP 302 redirects.
+- **Fast Redirections**: Simple links (no password, geo/IP rules, device targeting, A/B test, click cap or preview page) are served straight from Redis without a database trip; cache entries expire with the link and are evicted on deactivate/delete. Links that need a per-request decision always take the database path.
 - **Base62 & Custom Aliases**: Generate clean 7-character short codes or customize your own branded vanity links.
 - **📱 Device-Based Deep Linking**: Route users to specialized URLs based on their client device (**iOS**, **Android**, **Desktop**).
 - **🌍 Geo-Blocking & Fallback Routing**: Restrict access by ISO country codes or IP CIDR subnets with custom fallback destinations.
@@ -207,7 +207,7 @@ Prometheus metrics are exposed at `/actuator/prometheus` and require an admin JW
 
 | Metric | Description |
 | :--- | :--- |
-| `klink_redirect_seconds` | Redirect latency histogram, tagged by `outcome` (`redirect`, `preview`, `not_found`, `error`) |
+| `klink_redirect_seconds` | Redirect latency histogram, tagged by `outcome` (`cache_hit`, `redirect`, `preview`, `not_found`, `error`) |
 | `klink_click_events_total` | Click events by `outcome` (`queued`, `fallback_db`, `failed`) |
 | `klink_rabbitmq_queue_messages` / `klink_rabbitmq_queue_consumers` | Click queue depth and consumers (`NaN` when the broker is unreachable) |
 

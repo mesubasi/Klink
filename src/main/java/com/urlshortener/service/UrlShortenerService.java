@@ -246,9 +246,7 @@ public class UrlShortenerService {
             }
         }
 
-        if (!mapping.isPasswordProtected() && !hasRestrictions && !hasDeviceTargeting && !abTestActive && mapping.getMaxClicks() == null) {
-            cacheUrl(shortCode, originalUrl);
-        }
+        cacheMapping(mapping);
 
         return buildShortenResponse(mapping);
     }
@@ -309,7 +307,22 @@ public class UrlShortenerService {
         }
 
         publishClickEvent(shortCode, request, mapping);
+        cacheMapping(mapping);
         return resolveTargetByDevice(mapping, request);
+    }
+
+    /**
+     * Fast redirect path: returns the target URL straight from Redis for "simple" links
+     * (see {@link #isCacheable(UrlMapping)}) and records the click, without touching the database.
+     * Returns empty on a cache miss or when Redis is unavailable, so callers fall back to the database path.
+     */
+    public Optional<String> resolveFromCache(String shortCode, HttpServletRequest request) {
+        String cachedUrl = getFromCache(shortCode);
+        if (cachedUrl == null || cachedUrl.isBlank()) {
+            return Optional.empty();
+        }
+        publishClickEventForUrl(shortCode, request, cachedUrl);
+        return Optional.of(cachedUrl);
     }
 
     public String verifyPasswordAndGetUrl(String shortCode, String password, HttpServletRequest request) {
@@ -655,8 +668,8 @@ public class UrlShortenerService {
         if (!active) {
             evictFromCache(shortCode);
             log.info("Link pasife alındı ve Redis cache silindi: {}", shortCode);
-        } else if (!mapping.isPasswordProtected()) {
-            cacheUrl(shortCode, mapping.getOriginalUrl());
+        } else {
+            cacheMapping(mapping);
             log.info("Link aktife alındı ve Redis cache güncellendi: {}", shortCode);
         }
 
@@ -758,6 +771,10 @@ public class UrlShortenerService {
     }
 
     private void publishClickEvent(String shortCode, HttpServletRequest request, UrlMapping mapping) {
+        publishClickEventForUrl(shortCode, request, mapping != null ? mapping.getOriginalUrl() : null);
+    }
+
+    private void publishClickEventForUrl(String shortCode, HttpServletRequest request, String originalUrl) {
         String clientIp = getClientIp(request);
         String userAgent = request != null ? request.getHeader("User-Agent") : null;
         GeoIpService.GeoLocation location = geoIpService.resolveLocation(clientIp);
@@ -772,8 +789,8 @@ public class UrlShortenerService {
         String utmTerm = request != null ? request.getParameter("utm_term") : null;
         String utmContent = request != null ? request.getParameter("utm_content") : null;
 
-        if (mapping != null && mapping.getOriginalUrl() != null) {
-            Map<String, String> queryParams = parseQueryParams(mapping.getOriginalUrl());
+        if (originalUrl != null) {
+            Map<String, String> queryParams = parseQueryParams(originalUrl);
             if (utmSource == null || utmSource.trim().isEmpty()) utmSource = queryParams.get("utm_source");
             if (utmMedium == null || utmMedium.trim().isEmpty()) utmMedium = queryParams.get("utm_medium");
             if (utmCampaign == null || utmCampaign.trim().isEmpty()) utmCampaign = queryParams.get("utm_campaign");
@@ -844,9 +861,53 @@ public class UrlShortenerService {
         return referrer;
     }
 
-    private void cacheUrl(String shortCode, String originalUrl) {
+    /**
+     * A cache entry means: the link is active, not expired and redirects every visitor to the same
+     * target without any per-request decision (no password, geo/IP rules, device targeting, A/B test,
+     * click cap or preview page). Anything else must go through the database path.
+     */
+    public boolean isCacheable(UrlMapping mapping) {
+        if (!mapping.isActive() || mapping.isPasswordProtected() || mapping.isPreviewEnabled() || mapping.isAbTestingEnabled()) {
+            return false;
+        }
+        if (mapping.getMaxClicks() != null) {
+            return false;
+        }
+        if (hasText(mapping.getBlockedCountries()) || hasText(mapping.getBlockedIps())) {
+            return false;
+        }
+        if (hasText(mapping.getIosUrl()) || hasText(mapping.getAndroidUrl()) || hasText(mapping.getDesktopUrl())) {
+            return false;
+        }
+        return mapping.getExpiresAt() == null || mapping.getExpiresAt() > System.currentTimeMillis();
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    /** Caches the mapping when it is cacheable; the entry expires with the link if it has an expiry date. */
+    private void cacheMapping(UrlMapping mapping) {
+        if (!isCacheable(mapping)) {
+            evictFromCache(mapping.getShortCode());
+            return;
+        }
+        Duration ttl = Duration.ofHours(24);
+        if (mapping.getExpiresAt() != null) {
+            Duration untilExpiry = Duration.ofMillis(mapping.getExpiresAt() - System.currentTimeMillis());
+            if (untilExpiry.compareTo(ttl) < 0) {
+                ttl = untilExpiry;
+            }
+        }
+        if (ttl.isZero() || ttl.isNegative()) {
+            return;
+        }
+        cacheUrl(mapping.getShortCode(), mapping.getOriginalUrl(), ttl);
+    }
+
+    private void cacheUrl(String shortCode, String originalUrl, Duration ttl) {
         try {
-            redisTemplate.opsForValue().set(REDIS_PREFIX + shortCode, originalUrl, Duration.ofHours(24));
+            redisTemplate.opsForValue().set(REDIS_PREFIX + shortCode, originalUrl, ttl);
         } catch (Exception e) {
             log.warn("Redis kaydı sırasında hata oluştu: {}", e.getMessage());
         }

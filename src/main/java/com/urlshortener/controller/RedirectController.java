@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.net.URI;
+import java.util.Optional;
 
 @Controller
 @Tag(name = "Yönlendirme Servisi", description = "Kısa linklere tıklayan kullanıcıları Orijinal URL'ye veya Güvenlik Önizleme Sayfasına HTTP 302 ile yönlendiren servis")
@@ -55,6 +56,15 @@ public class RedirectController {
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = "error";
         try {
+            // Fast path: simple links are served straight from Redis without a database round trip.
+            Optional<String> cachedTarget = urlShortenerService.resolveFromCache(shortCode, request);
+            if (cachedTarget.isPresent()) {
+                outcome = "cache_hit";
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .location(URI.create(cachedTarget.get()))
+                        .build();
+            }
+
             UrlMapping mapping = urlShortenerService.getUrlMapping(shortCode);
 
             if (mapping.isPreviewEnabled() && !direct) {
