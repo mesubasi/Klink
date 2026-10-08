@@ -27,7 +27,7 @@ public class WorkspacePermissionController {
     @Operation(summary = "Çalışma Alanı İzin Matrisini Getir", description = "Çalışma alanındaki MEMBER ve VIEWER rollerine ait güncel izin durumlarını Redis önbelleğinden veya veritabanından getirir.")
     @ApiResponse(responseCode = "200", description = "İzin matrisi başarıyla getirildi")
     public ResponseEntity<WorkspacePermissionMatrixResponse> getPermissionMatrix(@PathVariable UUID workspaceId) {
-        WorkspacePermissionMatrixResponse response = permissionService.getPermissionMatrix(workspaceId);
+        WorkspacePermissionMatrixResponse response = permissionService.getPermissionMatrixForCurrentUser(workspaceId);
         return ResponseEntity.ok(response);
     }
 

@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Language } from '@/lib/translations';
-import { ShortenResponse, UserDto, SystemStatusResponse, ApiKeyResponse, ApiKeyStatus } from '@/lib/types';
+import { ShortenResponse, UserDto, SystemStatusResponse, ApiKeyResponse, ApiKeyStatus, WorkspaceResponse } from '@/lib/types';
 import { ApiClient } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,7 +53,7 @@ export default function AdminCrmPage() {
   const [lang] = useState<Language>('tr');
   const [adminAuth, setAdminAuth] = useState<{ u: string; p: string; token?: string; role?: string } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'system' | 'users' | 'links' | 'api-keys'>('system');
+  const [activeSubTab, setActiveSubTab] = useState<'system' | 'users' | 'links' | 'workspaces' | 'api-keys'>('system');
 
   const [allLinks, setAllLinks] = useState<ShortenResponse[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKeyResponse[]>([]);
@@ -70,6 +70,7 @@ export default function AdminCrmPage() {
 
   const [systemStatus, setSystemStatus] = useState<SystemStatusResponse | null>(null);
   const [usersList, setUsersList] = useState<UserDto[]>([]);
+  const [workspaceList, setWorkspaceList] = useState<WorkspaceResponse[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem('klink_user') || localStorage.getItem('swiftlink_user');
@@ -95,12 +96,14 @@ export default function AdminCrmPage() {
     setLoading(true);
     setErrorMsg('');
     try {
-      const [links, telemetry, keys, users] = await Promise.all([
+      const [links, telemetry, keys, users, workspaces] = await Promise.all([
         ApiClient.getAllUrls(lang, adminAuth as any),
         ApiClient.getSystemStatus(lang, adminAuth as any),
         ApiClient.getAdminApiKeys(undefined, lang, adminAuth as any),
-        ApiClient.getAdminUsers(lang, adminAuth as any)
+        ApiClient.getAdminUsers(lang, adminAuth as any),
+        ApiClient.getAllWorkspaces(lang, adminAuth as any)
       ]);
+      setWorkspaceList(workspaces);
       setAllLinks(links);
       if (telemetry) {
         setSystemStatus(telemetry);
@@ -429,6 +432,10 @@ export default function AdminCrmPage() {
             <TabsTrigger value="links" className="flex items-center gap-1.5 text-xs font-semibold">
               <Globe2 className="w-3.5 h-3.5" />
               <span>Tüm Linkler ({allLinks.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="workspaces" className="flex items-center gap-1.5 text-xs font-semibold">
+              <Users className="w-3.5 h-3.5" />
+              <span>Müşteriler ({workspaceList.length})</span>
             </TabsTrigger>
             <TabsTrigger value="api-keys" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-950">
               <KeyRound className="w-3.5 h-3.5" />
@@ -819,6 +826,54 @@ export default function AdminCrmPage() {
           </TabsContent>
 
           {/* Sub-tab 3: Global Link Overseer Table */}
+          <TabsContent value="workspaces">
+            <Card className="border-zinc-200/90 shadow-sm overflow-hidden bg-white">
+              <CardHeader className="border-b border-zinc-100 pb-4 bg-zinc-50/40">
+                <CardTitle className="text-base font-bold text-zinc-950">Müşteri Çalışma Alanları</CardTitle>
+                <CardDescription className="text-xs mt-0.5 text-zinc-500">
+                  Platformdaki tüm şirketler. Sistem yöneticisi olarak her çalışma alanını üye olmadan görüntüleyebilir ve yönetebilirsiniz.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Şirket</TableHead>
+                      <TableHead>Sahip</TableHead>
+                      <TableHead>Üye</TableHead>
+                      <TableHead>Link</TableHead>
+                      <TableHead>Oluşturulma</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {workspaceList.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center text-xs text-zinc-500">
+                          Henüz kayıtlı müşteri çalışma alanı yok.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      workspaceList.map((ws) => (
+                        <TableRow key={ws.id}>
+                          <TableCell className="text-xs font-semibold text-zinc-950">
+                            {ws.name}
+                            <span className="ml-2 font-mono text-[10px] text-zinc-400">{ws.slug}</span>
+                          </TableCell>
+                          <TableCell className="text-xs text-zinc-600">@{ws.ownerUsername}</TableCell>
+                          <TableCell className="text-xs font-mono">{ws.memberCount}</TableCell>
+                          <TableCell className="text-xs font-mono">{ws.linkCount}</TableCell>
+                          <TableCell className="text-xs text-zinc-500">
+                            {ws.createdAt ? new Date(ws.createdAt).toLocaleDateString('tr-TR') : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="links">
             <Card className="border-zinc-200/90 shadow-sm overflow-hidden bg-white">
               <CardHeader className="border-b border-zinc-100 pb-4 bg-zinc-50/40">
