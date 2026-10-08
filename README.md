@@ -146,7 +146,7 @@ mvnw.cmd spring-boot:run
 ```
 *Note: In `prod` profile the schema is managed by Flyway migrations (`src/main/resources/db/migration`) and Hibernate only validates it. Existing databases are baselined at V1 automatically.*
 
-*Note: In `dev` profile, backend automatically initializes in-memory H2 database (`http://localhost:8080/h2-console`) with seeded test accounts (`admin` / `admin123` and `user` / `password`).*
+*Note: In `dev` profile, backend automatically initializes in-memory H2 database (`http://localhost:8080/h2-console`) with seeded test accounts (`admin` / `admin123` and `user` / `password`). These demo accounts are never created with the `prod` profile.*
 
 ### 4. Start Frontend (Next.js)
 ```bash
@@ -191,6 +191,8 @@ Create a `.env` file based on `.env.example`:
 | `GET` | `/api/v1/urls/my-urls` | Retrieve all shortened URLs for authenticated user | User / Admin |
 | `GET` | `/api/v1/urls/my-urls/search` | Search (`q`), filter (`ALL`, `PROTECTED`, `PREVIEW`, `BROKEN`) and paginate (`page`, `size` ≤ 100, `sortBy`, `direction`) your links | User / Admin |
 | `GET` | `/api/v1/urls/my-urls/stats` | Aggregate counters for your links (total, clicks, protected, broken, healthy) | User / Admin |
+| `POST` | `/api/v1/auth/forgot-password`, `/auth/reset-password`, `/auth/verify-email` | Password reset and email verification (single-use links) | Public |
+| `POST` | `/api/v1/admin/workspaces` | Open a customer workspace and appoint its manager | Admin |
 | `GET` | `/actuator/prometheus` | Prometheus metrics (redirect latency, click events, RabbitMQ queue depth) | Admin |
 | `GET` | `/api/v1/urls/{shortCode}/analytics` | Comprehensive click telemetry & geo stats | Owner / Admin |
 | `GET` | `/api/v1/urls/{shortCode}/qrcode` | Generate dynamic customized PNG or SVG QR code | Public |
@@ -217,11 +219,23 @@ Permissions follow the role, not link ownership: a member who created a link is 
 
 ### 🏢 Customers, Invitations & Platform Admins
 
-Klink is multi-tenant: every customer company is a workspace. The person who creates it becomes its `ADMIN` and can bring in their own staff:
+Klink is multi-tenant: every customer company is a workspace.
 
-- **Invite by email** (`POST /api/v1/workspaces/{id}/invitations`): an already registered email is added immediately; otherwise a single-use invitation link (valid for `INVITATION_EXPIRY_DAYS`, default 7) is emailed. The link only works for the invited address, only the SHA-256 hash of its token is stored, and re-inviting or revoking invalidates older links. If SMTP is not configured the link is shown to the inviter instead. Invitees open `/invite/{token}`, register or log in, and accept.
-- **Platform admins (`ROLE_ADMIN`)** see every workspace under `GET /api/v1/admin/workspaces` (the **Müşteriler** tab of the admin panel) and can read and manage any workspace — members, invitations, permission matrix, links — without being a member.
-- Set `FRONTEND_INVITE_URL` (default `https://klink.to/invite/%s`) so emailed links point at your frontend.
+**Onboarding a customer.** A platform admin opens the admin panel → **Müşteriler**, enters the company name, the manager's email and optional limits. The manager is added right away if already registered, otherwise emailed an invitation, and then invites their own staff. (`POST /api/v1/admin/workspaces`; self-service creation can be switched off with `SELF_SERVICE_WORKSPACES=false`.)
+
+**Inviting staff.** Workspace admins invite by email (`POST /api/v1/workspaces/{id}/invitations`): a registered email is added immediately, otherwise a single-use invitation link (valid for `INVITATION_EXPIRY_DAYS`, default 7) is emailed. The link only works for the invited address, only the SHA-256 hash of its token is stored, and re-inviting or revoking invalidates older links. If SMTP is not configured the link is shown to the inviter instead. Invitees open `/invite/{token}`, register or log in, and accept.
+
+**Platform admins (`ROLE_ADMIN`)** see every workspace under `GET /api/v1/admin/workspaces` and can read and manage any workspace — members, invitations, permission matrix, links, quotas — without being a member.
+
+**Plan limits.** Each workspace can cap its members (pending invitations count) and links; blank or `0` means unlimited. Admins edit them per customer; new self-service workspaces start from `QUOTA_DEFAULT_MAX_MEMBERS` / `QUOTA_DEFAULT_MAX_LINKS`, and one account may own at most `QUOTA_MAX_WORKSPACES_PER_USER` (default 5) workspaces. Platform admins are never blocked by a customer's limits. Exceeding a limit returns `403` with `"code": "QUOTA_EXCEEDED"`.
+
+### 🔑 Accounts, Email Verification & Password Reset
+
+- New accounts receive a verification email (24 h link). When `REQUIRE_EMAIL_VERIFICATION` is on (the production default) **and SMTP is configured**, unverified users cannot create workspaces or accept invitations. Without SMTP nothing is enforced, so nobody gets locked out.
+- "Şifremi unuttum" sends a 1-hour, single-use reset link; the response is identical whether or not the email exists. Using the link also verifies the email. Reset and verification links are stored hashed.
+- Registration, password reset and verification calls are rate limited per IP on top of the global limiter.
+- **No well-known accounts in production.** `admin/admin123` and `user/password` are only created when `SEED_DEMO_USERS=true` (the development default; off with the `prod` profile). Create the first platform admin with `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` (12+ characters); it is only used while no admin exists. Databases created by older versions may still contain the demo accounts: the app logs a security warning at startup until you change or delete them.
+- `docker-compose.prod.yml` now refuses to start without `JWT_SECRET`, `DATABASE_PASSWORD` and `RABBITMQ_PASSWORD`.
 
 ### 📈 Metrics
 

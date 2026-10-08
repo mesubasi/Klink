@@ -16,6 +16,8 @@ public class WorkspaceResponse {
     private long linkCount;
     private Long createdAt;
     private List<WorkspaceMemberResponse> members;
+    private Integer maxMembers;
+    private Integer maxLinks;
 
     public WorkspaceResponse() {}
 
@@ -47,6 +49,8 @@ public class WorkspaceResponse {
         private long linkCount;
         private Long createdAt;
         private List<WorkspaceMemberResponse> members;
+        private Integer maxMembers;
+        private Integer maxLinks;
 
         public Builder id(UUID id) { this.id = id; return this; }
         public Builder name(String name) { this.name = name; return this; }
@@ -58,11 +62,21 @@ public class WorkspaceResponse {
         public Builder linkCount(long linkCount) { this.linkCount = linkCount; return this; }
         public Builder createdAt(Long createdAt) { this.createdAt = createdAt; return this; }
         public Builder members(List<WorkspaceMemberResponse> members) { this.members = members; return this; }
+        public Builder maxMembers(Integer maxMembers) { this.maxMembers = maxMembers; return this; }
+        public Builder maxLinks(Integer maxLinks) { this.maxLinks = maxLinks; return this; }
 
         public WorkspaceResponse build() {
-            return new WorkspaceResponse(id, name, description, slug, ownerUsername, currentUserRole, memberCount, linkCount, createdAt, members);
+            WorkspaceResponse response = new WorkspaceResponse(id, name, description, slug, ownerUsername, currentUserRole, memberCount, linkCount, createdAt, members);
+            response.setMaxMembers(maxMembers);
+            response.setMaxLinks(maxLinks);
+            return response;
         }
     }
+
+    public Integer getMaxMembers() { return maxMembers; }
+    public void setMaxMembers(Integer maxMembers) { this.maxMembers = maxMembers; }
+    public Integer getMaxLinks() { return maxLinks; }
+    public void setMaxLinks(Integer maxLinks) { this.maxLinks = maxLinks; }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

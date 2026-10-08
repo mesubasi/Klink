@@ -1,7 +1,9 @@
 package com.urlshortener.controller;
 
 import com.urlshortener.dto.*;
+import com.urlshortener.service.ActionRateLimiter;
 import com.urlshortener.service.AuthService;
+import com.urlshortener.service.AuthTokenService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,9 +22,21 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final AuthTokenService authTokenService;
+    private final ActionRateLimiter rateLimiter;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, AuthTokenService authTokenService, ActionRateLimiter rateLimiter) {
         this.authService = authService;
+        this.authTokenService = authTokenService;
+        this.rateLimiter = rateLimiter;
+    }
+
+    private static String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isEmpty()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 
     @PostMapping("/login")
@@ -80,9 +94,48 @@ public class AuthController {
     @Operation(summary = "Yeni Kullanıcı Kaydı (Üye Ol)", description = "Sisteme yeni bir kullanıcı hesabı açar ve JWT token döner.")
     @ApiResponse(responseCode = "201", description = "Kullanıcı kaydı başarıyla oluşturuldu")
     @ApiResponse(responseCode = "400", description = "Kullanıcı adı veya e-posta adresi zaten kullanımda")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
+        rateLimiter.check("register", clientIp(httpRequest), 10, java.time.Duration.ofHours(1));
         AuthResponse response = authService.register(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/verify-email")
+    @Operation(summary = "E-posta Adresini Doğrula", description = "Doğrulama e-postasındaki tek kullanımlık anahtarla e-posta adresini doğrular.")
+    public ResponseEntity<java.util.Map<String, String>> verifyEmail(@Valid @RequestBody TokenRequest request, HttpServletRequest httpRequest) {
+        rateLimiter.check("verify-email", clientIp(httpRequest), 30, java.time.Duration.ofHours(1));
+        authTokenService.verifyEmail(request.getToken());
+        return ResponseEntity.ok(java.util.Collections.singletonMap("message", "E-posta adresiniz doğrulandı."));
+    }
+
+    @PostMapping("/resend-verification")
+    @Operation(summary = "Doğrulama E-postasını Yeniden Gönder", description = "Giriş yapmış kullanıcıya yeni bir doğrulama bağlantısı gönderir (dakikada en fazla bir kez).")
+    public ResponseEntity<java.util.Map<String, String>> resendVerification(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        rateLimiter.check("resend-verification", authentication.getName(), 5, java.time.Duration.ofHours(1));
+        boolean sent = authService.resendEmailVerification(authentication.getName());
+        return ResponseEntity.ok(java.util.Collections.singletonMap("message", sent
+                ? "Doğrulama e-postası gönderildi. Gelen kutunuzu kontrol edin."
+                : "E-posta zaten doğrulanmış ya da az önce bir bağlantı gönderilmiş. Lütfen bir dakika bekleyip tekrar deneyin."));
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Parola Sıfırlama İste", description = "E-posta kayıtlıysa 1 saat geçerli, tek kullanımlık sıfırlama bağlantısı gönderir. E-posta kayıtlı olsun ya da olmasın aynı yanıt döner.")
+    public ResponseEntity<java.util.Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest httpRequest) {
+        rateLimiter.check("forgot-password", clientIp(httpRequest), 5, java.time.Duration.ofHours(1));
+        authTokenService.requestPasswordReset(request.getEmail());
+        return ResponseEntity.ok(java.util.Collections.singletonMap("message",
+                "E-posta adresi kayıtlıysa parola sıfırlama bağlantısı gönderildi."));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Parolayı Sıfırla", description = "E-postadaki tek kullanımlık anahtarla yeni parola belirler.")
+    public ResponseEntity<java.util.Map<String, String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request, HttpServletRequest httpRequest) {
+        rateLimiter.check("reset-password", clientIp(httpRequest), 10, java.time.Duration.ofHours(1));
+        authTokenService.resetPassword(request.getToken(), request.getPassword());
+        return ResponseEntity.ok(java.util.Collections.singletonMap("message", "Parolanız güncellendi. Yeni parolanızla giriş yapabilirsiniz."));
     }
 
     @GetMapping("/me")

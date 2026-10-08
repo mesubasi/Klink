@@ -6,6 +6,8 @@ import {
   InviteMemberResponse,
   InvitationPreviewResponse,
   AcceptInvitationResponse,
+  CreateCustomerRequest,
+  ProvisionCustomerResponse,
   LinkStatsResponse,
   BulkShortenRequest, 
   BulkShortenResponse, 
@@ -1061,6 +1063,81 @@ export class ApiClient {
     }
 
     return await res.json();
+  }
+
+  // 31.7 POST /api/v1/admin/workspaces (system admin: open a customer workspace)
+  static async createCustomer(
+    request: CreateCustomerRequest,
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<ProvisionCustomerResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/admin/workspaces`, {
+      method: 'POST',
+      headers: this.getHeaders(lang, authUser),
+      body: JSON.stringify(request),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Müşteri oluşturulamadı.');
+    }
+
+    return await res.json();
+  }
+
+  // 31.8 PUT /api/v1/admin/workspaces/{id}/quota (system admin)
+  static async updateWorkspaceQuota(
+    workspaceId: string,
+    quota: { maxMembers: number | null; maxLinks: number | null },
+    lang: string = 'tr',
+    authUser?: { u?: string; p?: string; token?: string }
+  ): Promise<WorkspaceResponse> {
+    const res = await this.safeFetch(`${API_BASE_URL}/admin/workspaces/${workspaceId}/quota`, {
+      method: 'PUT',
+      headers: this.getHeaders(lang, authUser),
+      body: JSON.stringify(quota),
+    });
+
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Kota güncellenemedi.');
+    }
+
+    return await res.json();
+  }
+
+  // 31.9 Email verification and password reset
+  private static async postAuthAction(path: string, body: unknown, fallbackError: string, lang: string, authUser?: { u?: string; p?: string; token?: string }): Promise<string> {
+    const res = await this.safeFetch(`${API_BASE_URL}/auth/${path}`, {
+      method: 'POST',
+      headers: this.getHeaders(lang, authUser),
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+    if (!res) {
+      throw new Error('Sunucuya bağlanılamadı. Lütfen daha sonra tekrar deneyin.');
+    }
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.message || fallbackError);
+    }
+    return data?.message || '';
+  }
+
+  static verifyEmail(token: string, lang: string = 'tr'): Promise<string> {
+    return this.postAuthAction('verify-email', { token }, 'E-posta doğrulanamadı.', lang);
+  }
+
+  static resendEmailVerification(lang: string = 'tr', authUser?: { u?: string; p?: string; token?: string }): Promise<string> {
+    return this.postAuthAction('resend-verification', undefined, 'Doğrulama e-postası gönderilemedi.', lang, authUser);
+  }
+
+  static forgotPassword(email: string, lang: string = 'tr'): Promise<string> {
+    return this.postAuthAction('forgot-password', { email }, 'İstek gönderilemedi.', lang);
+  }
+
+  static resetPassword(token: string, password: string, lang: string = 'tr'): Promise<string> {
+    return this.postAuthAction('reset-password', { token, password }, 'Parola sıfırlanamadı.', lang);
   }
 
   // 31.6 GET /api/v1/admin/workspaces (system admin)

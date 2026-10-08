@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-klinkdb}
       POSTGRES_USER: ${DATABASE_USERNAME:-klink_admin}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-klink_secret_password}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -41,7 +41,7 @@ services:
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-klink_mq}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-klink_mq_pass}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     ports:
@@ -71,16 +71,39 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       DATABASE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-klinkdb}
       DATABASE_USERNAME: ${DATABASE_USERNAME:-klink_admin}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-klink_secret_password}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-klink_mq}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-klink_mq_pass}
-      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (base64, at least 256 bits)}
       APP_DOMAIN: ${APP_DOMAIN:-https://klink.to}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://klink.to,http://localhost:3000}
+      # Email (verification, password reset, invitations). Without SMTP no mail is sent.
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SPRING_MAIL_SMTP_AUTH: ${SPRING_MAIL_SMTP_AUTH:-true}
+      SPRING_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:-true}
+      # Links inside emails point at the frontend
+      FRONTEND_PREVIEW_URL: ${FRONTEND_PREVIEW_URL:-https://klink.to/preview/%s}
+      FRONTEND_INVITE_URL: ${FRONTEND_INVITE_URL:-https://klink.to/invite/%s}
+      FRONTEND_VERIFY_URL: ${FRONTEND_VERIFY_URL:-https://klink.to/verify-email/%s}
+      FRONTEND_RESET_URL: ${FRONTEND_RESET_URL:-https://klink.to/reset-password/%s}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
+      # First platform admin (only used while no admin exists)
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      # Plan limits (0 = unlimited)
+      QUOTA_DEFAULT_MAX_MEMBERS: ${QUOTA_DEFAULT_MAX_MEMBERS:-0}
+      QUOTA_DEFAULT_MAX_LINKS: ${QUOTA_DEFAULT_MAX_LINKS:-0}
+      QUOTA_MAX_WORKSPACES_PER_USER: ${QUOTA_MAX_WORKSPACES_PER_USER:-5}
+      SELF_SERVICE_WORKSPACES: ${SELF_SERVICE_WORKSPACES:-true}
     ports:
       - "8080:8080"
 

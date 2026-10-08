@@ -47,6 +47,12 @@ public class AuthControllerTest {
     private AuthService authService;
 
     @MockitoBean
+    private com.urlshortener.service.AuthTokenService authTokenService;
+
+    @MockitoBean
+    private com.urlshortener.service.ActionRateLimiter actionRateLimiter;
+
+    @MockitoBean
     private MessageService messageService;
 
     @MockitoBean

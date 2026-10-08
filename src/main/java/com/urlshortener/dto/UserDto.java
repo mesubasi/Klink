@@ -9,6 +9,7 @@ public class UserDto {
     private String role;
     private boolean twoFactorEnabled;
     private Long createdAt;
+    private boolean emailVerified;
 
     public UserDto() {}
 
@@ -30,6 +31,7 @@ public class UserDto {
         private String role;
         private boolean twoFactorEnabled;
         private Long createdAt;
+        private boolean emailVerified;
 
         public Builder id(UUID id) { this.id = id; return this; }
         public Builder username(String username) { this.username = username; return this; }
@@ -37,9 +39,12 @@ public class UserDto {
         public Builder role(String role) { this.role = role; return this; }
         public Builder twoFactorEnabled(boolean twoFactorEnabled) { this.twoFactorEnabled = twoFactorEnabled; return this; }
         public Builder createdAt(Long createdAt) { this.createdAt = createdAt; return this; }
+        public Builder emailVerified(boolean emailVerified) { this.emailVerified = emailVerified; return this; }
 
         public UserDto build() {
-            return new UserDto(id, username, email, role, twoFactorEnabled, createdAt);
+            UserDto dto = new UserDto(id, username, email, role, twoFactorEnabled, createdAt);
+            dto.setEmailVerified(emailVerified);
+            return dto;
         }
     }
 
@@ -55,4 +60,6 @@ public class UserDto {
     public void setTwoFactorEnabled(boolean twoFactorEnabled) { this.twoFactorEnabled = twoFactorEnabled; }
     public Long getCreatedAt() { return createdAt; }
     public void setCreatedAt(Long createdAt) { this.createdAt = createdAt; }
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
 }

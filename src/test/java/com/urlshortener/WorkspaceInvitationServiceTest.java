@@ -62,7 +62,8 @@ class WorkspaceInvitationServiceTest {
         emailService = mock(EmailService.class);
 
         service = new WorkspaceInvitationService(invitationRepository, workspaceRepository, memberRepository,
-                userRepository, workspaceService, emailService);
+                userRepository, workspaceService, emailService, mock(com.urlshortener.service.EmailVerificationPolicy.class),
+                mock(com.urlshortener.service.QuotaService.class));
         ReflectionTestUtils.setField(service, "expiryDays", 7);
         ReflectionTestUtils.setField(service, "inviteUrlPattern", "https://app.test/invite/%s");
 

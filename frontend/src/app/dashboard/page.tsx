@@ -58,6 +58,8 @@ export default function UserDashboardPage() {
   const refreshLinks = () => setRefreshKey((k) => k + 1);
   const [scanningAll, setScanningAll] = useState(false);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [verificationNotice, setVerificationNotice] = useState('');
 
   // Modal States
   const [qrCodeModal, setQrCodeModal] = useState<string | null>(null);
@@ -92,6 +94,7 @@ export default function UserDashboardPage() {
     try {
       const user = await ApiClient.getCurrentUser(lang, authUser as any);
       setIs2FAEnabled(!!user.twoFactorEnabled);
+      setEmailVerified(user.emailVerified !== false);
     } catch (e) {
       console.error(e);
     }
@@ -116,6 +119,16 @@ export default function UserDashboardPage() {
       console.error(e);
     } finally {
       setScanningAll(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!authUser) return;
+    try {
+      const message = await ApiClient.resendEmailVerification(lang, authUser as any);
+      setVerificationNotice(message || 'Doğrulama e-postası gönderildi. Gelen kutunuzu kontrol edin.');
+    } catch (e: any) {
+      setVerificationNotice(e.message || 'Doğrulama e-postası gönderilemedi.');
     }
   };
 
@@ -182,6 +195,16 @@ export default function UserDashboardPage() {
       />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 space-y-6 w-full flex-1">
+        {!emailVerified && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200">
+            <span>
+              {verificationNotice || 'E-posta adresiniz henüz doğrulanmadı. Çalışma alanı oluşturmak ve davetleri kabul etmek için doğrulamanız gerekebilir.'}
+            </span>
+            <Button size="sm" variant="outline" className="text-xs h-7 shrink-0" onClick={handleResendVerification}>
+              Doğrulama e-postasını yeniden gönder
+            </Button>
+          </div>
+        )}
         {/* Top Breadcrumb & Action Toolbar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
