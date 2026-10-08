@@ -52,6 +52,10 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // Missing, expired or revoked credentials get 401 (so clients can send the user back to the login page);
+            // 403 stays reserved for authenticated users who lack permission.
+            .exceptionHandling(ex -> ex.authenticationEntryPoint(
+                    new org.springframework.security.web.authentication.HttpStatusEntryPoint(org.springframework.http.HttpStatus.UNAUTHORIZED)))
             .headers(headers -> headers
                 .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
                 .contentTypeOptions(org.springframework.security.config.Customizer.withDefaults())
