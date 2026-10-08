@@ -19,6 +19,10 @@ spring:
       settings:
         web-allow-others: false
 
+  # Schema is managed by Hibernate in dev (H2); Flyway is enabled in the prod profile.
+  flyway:
+    enabled: false
+
   jpa:
     database-platform: ${JPA_DIALECT:org.hibernate.dialect.H2Dialect}
     hibernate:
