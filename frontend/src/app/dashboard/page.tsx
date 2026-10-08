@@ -33,7 +33,7 @@ import { AnalyticsModal } from '@/components/AnalyticsModal';
 import { PasswordVerifyModal } from '@/components/PasswordVerifyModal';
 import { TwoFactorModal } from '@/components/TwoFactorModal';
 import { Language, translations } from '@/lib/translations';
-import { ShortenResponse, BulkShortenResponse } from '@/lib/types';
+import { ShortenResponse, BulkShortenResponse, LinkStatsResponse } from '@/lib/types';
 import { ApiClient } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -46,8 +46,16 @@ export default function UserDashboardPage() {
   const [authUser, setAuthUser] = useState<{ u: string; p: string; token?: string; role?: string } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  const [links, setLinks] = useState<ShortenResponse[]>([]);
-  const [loadingLinks, setLoadingLinks] = useState(false);
+  const [stats, setStats] = useState<LinkStatsResponse>({
+    totalLinks: 0,
+    totalClicks: 0,
+    protectedCount: 0,
+    brokenCount: 0,
+    healthyCount: 0,
+  });
+  // Bumped after every mutation so the links table and the stats cards reload from the server.
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refreshLinks = () => setRefreshKey((k) => k + 1);
   const [scanningAll, setScanningAll] = useState(false);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
 
@@ -89,16 +97,12 @@ export default function UserDashboardPage() {
     }
   };
 
-  const fetchMyLinks = async () => {
+  const fetchStats = async () => {
     if (!authUser) return;
-    setLoadingLinks(true);
     try {
-      const data = await ApiClient.getMyUrls(lang, authUser as any);
-      setLinks(data);
+      setStats(await ApiClient.getMyUrlStats(lang, authUser as any));
     } catch (e) {
       console.error(e);
-    } finally {
-      setLoadingLinks(false);
     }
   };
 
@@ -106,8 +110,8 @@ export default function UserDashboardPage() {
     if (!authUser) return;
     setScanningAll(true);
     try {
-      const data = await ApiClient.checkAllLinksHealth(lang, authUser as any);
-      setLinks(data);
+      await ApiClient.checkAllLinksHealth(lang, authUser as any);
+      refreshLinks();
     } catch (e) {
       console.error(e);
     } finally {
@@ -115,43 +119,45 @@ export default function UserDashboardPage() {
     }
   };
 
-  const handleLinkUpdated = (updated: ShortenResponse) => {
-    setLinks((prev) => prev.map((l) => (l.shortCode === updated.shortCode ? updated : l)));
+  const handleLinkUpdated = () => {
+    fetchStats();
   };
 
   useEffect(() => {
     fetchUserData();
-    fetchMyLinks();
   }, [lang, authUser]);
 
+  useEffect(() => {
+    fetchStats();
+  }, [lang, authUser, refreshKey]);
+
   const handleShortenSuccess = (newLink: ShortenResponse) => {
-    setLinks((prev) => [newLink, ...prev]);
+    refreshLinks();
   };
 
   const handleBulkSuccess = (batch: BulkShortenResponse) => {
-    setLinks((prev) => [...batch.shortenedUrls, ...prev]);
+    refreshLinks();
   };
 
   const handleToggleStatus = async (shortCode: string, currentActive: boolean) => {
     try {
       await ApiClient.toggleStatus(shortCode, !currentActive, lang, authUser as any);
-      setLinks((prev) =>
-        prev.map((item) => (item.shortCode === shortCode ? { ...item, active: !currentActive } : item))
-      );
+      refreshLinks();
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handleDeleteLink = (shortCode: string) => {
-    setLinks((prev) => prev.filter((item) => item.shortCode !== shortCode));
+  const handleDeleteLink = async (shortCode: string) => {
+    try {
+      await ApiClient.deleteUrl(shortCode, lang, authUser as any);
+    } catch (e) {
+      console.error(e);
+    }
+    refreshLinks();
   };
 
-  const totalClicks = links.reduce((acc, curr) => acc + (curr.clickCount || 0), 0);
-  const activeCount = links.length;
-  const protectedCount = links.filter((l) => l.passwordProtected).length;
-  const brokenCount = links.filter((l) => l.healthStatus === 'BROKEN').length;
-  const healthyCount = links.filter((l) => l.healthStatus === 'HEALTHY').length;
+  const { totalClicks, totalLinks, protectedCount, brokenCount, healthyCount } = stats;
 
   if (!authChecked || !authUser) {
     return (
@@ -195,7 +201,7 @@ export default function UserDashboardPage() {
               variant="outline"
               size="sm"
               onClick={handleScanAllHealth}
-              disabled={scanningAll || links.length === 0}
+              disabled={scanningAll || totalLinks === 0}
               className="text-xs h-8 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-800 dark:hover:text-emerald-300 border-emerald-200 dark:border-emerald-800 cursor-pointer"
               title="Tüm linklerin sağlık kontrolünü yap"
             >
@@ -236,7 +242,7 @@ export default function UserDashboardPage() {
               </div>
             </div>
             <div>
-              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950 dark:text-white">{links.length}</h4>
+              <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950 dark:text-white">{totalLinks}</h4>
               <p className="text-[11px] text-zinc-400 font-medium mt-0.5">
                 {protectedCount} {lang === 'tr' ? 'şifre korumalı' : 'password protected'}
               </p>
@@ -275,7 +281,7 @@ export default function UserDashboardPage() {
                     {brokenCount} <span className="text-xs font-semibold uppercase text-red-600 dark:text-red-400">{t.healthBroken}</span>
                   </span>
                 ) : (
-                  <span>{healthyCount > 0 ? `${healthyCount}/${links.length}` : (links.length > 0 ? links.length : 0)}</span>
+                  <span>{healthyCount > 0 ? `${healthyCount}/${totalLinks}` : (totalLinks > 0 ? totalLinks : 0)}</span>
                 )}
               </h4>
               <p className="text-[11px] text-zinc-400 font-medium mt-0.5">
@@ -298,7 +304,7 @@ export default function UserDashboardPage() {
             </div>
             <div>
               <h4 className="text-2xl sm:text-3xl font-black font-mono text-zinc-950 dark:text-white">
-                {links.length > 0 ? (totalClicks / links.length).toFixed(1) : '0.0'}
+                {totalLinks > 0 ? (totalClicks / totalLinks).toFixed(1) : '0.0'}
               </h4>
               <p className="text-[11px] text-zinc-400 font-medium mt-0.5">
                 {lang === 'tr' ? 'Tıklama / Link Ort.' : 'Avg per Link'}
@@ -362,7 +368,8 @@ export default function UserDashboardPage() {
 
             <MyLinksTable
               lang={lang}
-              links={links}
+              refreshKey={refreshKey}
+              brokenCount={brokenCount}
               authUser={authUser}
               onToggleStatus={handleToggleStatus}
               onOpenQr={(shortCode) => setQrCodeModal(shortCode)}
@@ -377,7 +384,8 @@ export default function UserDashboardPage() {
           <TabsContent value="vault">
             <MyLinksTable
               lang={lang}
-              links={links}
+              refreshKey={refreshKey}
+              brokenCount={brokenCount}
               authUser={authUser}
               onToggleStatus={handleToggleStatus}
               onOpenQr={(shortCode) => setQrCodeModal(shortCode)}

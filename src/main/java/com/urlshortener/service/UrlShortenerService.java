@@ -581,7 +581,7 @@ public class UrlShortenerService {
     private static final int MAX_PAGE_SIZE = 100;
     private static final java.util.Set<String> SORTABLE_FIELDS = java.util.Set.of("createdAt", "clickCount", "shortCode");
 
-    public PagedResponse<ShortenResponse> searchMyUrls(String query, int page, int size, String sortBy, boolean descending) {
+    public PagedResponse<ShortenResponse> searchMyUrls(String query, String filter, int page, int size, String sortBy, boolean descending) {
         UserAccount user = getCurrentAuthenticatedUser();
         if (user == null) {
             throw new IllegalArgumentException(messageService.getMessage("user.not_found", "me"));
@@ -597,13 +597,28 @@ public class UrlShortenerService {
         String pattern = "%" + escaped + "%";
 
         Page<UrlMapping> result = urlMappingRepository.searchByUsername(
-                user.getUsername(), pattern, PageRequest.of(safePage, safeSize, sort));
+                user.getUsername(), pattern, normalizeLinkFilter(filter), PageRequest.of(safePage, safeSize, sort));
 
         List<ShortenResponse> content = result.getContent().stream()
                 .map(this::buildShortenResponse)
                 .collect(Collectors.toList());
         return new PagedResponse<>(content, result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages());
+    }
+
+    private static final java.util.Set<String> LINK_FILTERS = java.util.Set.of("ALL", "PROTECTED", "PREVIEW", "BROKEN");
+
+    private String normalizeLinkFilter(String filter) {
+        String normalized = filter == null ? "ALL" : filter.trim().toUpperCase();
+        return LINK_FILTERS.contains(normalized) ? normalized : "ALL";
+    }
+
+    public LinkStatsResponse getMyUrlStats() {
+        UserAccount user = getCurrentAuthenticatedUser();
+        if (user == null) {
+            throw new IllegalArgumentException(messageService.getMessage("user.not_found", "me"));
+        }
+        return urlMappingRepository.getStatsByUsername(user.getUsername());
     }
 
     public ShortenResponse checkHealth(String shortCode) {

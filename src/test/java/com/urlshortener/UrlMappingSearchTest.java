@@ -44,7 +44,7 @@ class UrlMappingSearchTest {
     }
 
     private Page<UrlMapping> search(String username, String pattern, int page, int size) {
-        return urlMappingRepository.searchByUsername(username, pattern,
+        return urlMappingRepository.searchByUsername(username, pattern, "ALL",
                 PageRequest.of(page, size, Sort.by("createdAt").descending()));
     }
 
@@ -74,5 +74,37 @@ class UrlMappingSearchTest {
         assertEquals(2, first.getTotalPages());
         assertEquals("pct_100", first.getContent().get(0).getShortCode());
         assertEquals(1, search("alice", "%%", 1, 2).getContent().size());
+    }
+
+    @Test
+    void filtersByProtectionAndHealth() {
+        UserAccount carol = userRepository.save(UserAccount.builder()
+                .username("carol").email("carol@example.com").password("x").role("USER")
+                .createdAt(1L).build());
+        urlMappingRepository.save(UrlMapping.builder().originalUrl("https://a.example").shortCode("locked")
+                .createdAt(1L).passwordHash("hash").user(carol).build());
+        urlMappingRepository.save(UrlMapping.builder().originalUrl("https://b.example").shortCode("dead")
+                .createdAt(2L).healthStatus("BROKEN").user(carol).build());
+        urlMappingRepository.save(UrlMapping.builder().originalUrl("https://c.example").shortCode("ok")
+                .createdAt(3L).healthStatus("HEALTHY").clickCount(5L).user(carol).build());
+
+        PageRequest paging = PageRequest.of(0, 10, Sort.by("createdAt").descending());
+        assertEquals(1, urlMappingRepository.searchByUsername("carol", "%%", "PROTECTED", paging).getTotalElements());
+        assertEquals(1, urlMappingRepository.searchByUsername("carol", "%%", "BROKEN", paging).getTotalElements());
+        assertEquals(3, urlMappingRepository.searchByUsername("carol", "%%", "ALL", paging).getTotalElements());
+
+        com.urlshortener.dto.LinkStatsResponse stats = urlMappingRepository.getStatsByUsername("carol");
+        assertEquals(3, stats.getTotalLinks());
+        assertEquals(5, stats.getTotalClicks());
+        assertEquals(1, stats.getProtectedCount());
+        assertEquals(1, stats.getBrokenCount());
+        assertEquals(1, stats.getHealthyCount());
+    }
+
+    @Test
+    void statsForUserWithoutLinksAreZero() {
+        com.urlshortener.dto.LinkStatsResponse stats = urlMappingRepository.getStatsByUsername("nobody");
+        assertEquals(0, stats.getTotalLinks());
+        assertEquals(0, stats.getTotalClicks());
     }
 }

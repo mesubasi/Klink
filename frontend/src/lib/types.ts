@@ -405,3 +405,11 @@ export interface PagedResponse<T> {
   totalElements: number;
   totalPages: number;
 }
+
+export interface LinkStatsResponse {
+  totalLinks: number;
+  totalClicks: number;
+  protectedCount: number;
+  brokenCount: number;
+  healthyCount: number;
+}
