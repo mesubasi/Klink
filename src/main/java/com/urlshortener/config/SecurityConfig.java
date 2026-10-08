@@ -69,6 +69,9 @@ public class SecurityConfig {
                 // Actuator Healthcheck, H2 Konsolu ve Statik Kaynaklar
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/h2-console/**", "/error", "/css/**", "/js/**", "/index.html", "/").permitAll()
                 
+                // Prometheus metrikleri yalnızca ROLE_ADMIN (JWT) ile okunabilir
+                .requestMatchers("/actuator/prometheus").hasRole("ADMIN")
+
                 // Admin Özel Telemetri ve CRM Endpoint'leri (Yalnızca ROLE_ADMIN erişebilir)
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 

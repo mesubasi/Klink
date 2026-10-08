@@ -59,6 +59,15 @@ spring:
           starttls:
             enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:false}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 app:
   domain: ${APP_DOMAIN:http://localhost:8080}
   jwt:
