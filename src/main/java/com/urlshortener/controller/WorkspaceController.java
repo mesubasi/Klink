@@ -1,6 +1,7 @@
 package com.urlshortener.controller;
 
 import com.urlshortener.dto.*;
+import com.urlshortener.service.WorkspaceInvitationService;
 import com.urlshortener.service.WorkspaceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,9 +22,11 @@ import java.util.UUID;
 public class WorkspaceController {
 
     private final WorkspaceService workspaceService;
+    private final WorkspaceInvitationService invitationService;
 
-    public WorkspaceController(WorkspaceService workspaceService) {
+    public WorkspaceController(WorkspaceService workspaceService, WorkspaceInvitationService invitationService) {
         this.workspaceService = workspaceService;
+        this.invitationService = invitationService;
     }
 
     @PostMapping
@@ -75,6 +78,28 @@ public class WorkspaceController {
             @PathVariable UUID userId) {
         workspaceService.removeMember(workspaceId, userId);
         return ResponseEntity.ok(Collections.singletonMap("message", "Üye çalışma alanından başarıyla çıkarıldı."));
+    }
+
+    @PostMapping("/{workspaceId}/invitations")
+    @Operation(summary = "Çalışma Alanına Davet Gönder", description = "Kayıtlı bir e-posta doğrudan üye olarak eklenir; kayıtlı değilse e-posta ile tek kullanımlık, süreli davet bağlantısı gönderilir.")
+    public ResponseEntity<InviteMemberResponse> inviteMember(
+            @PathVariable UUID workspaceId,
+            @Valid @RequestBody AddWorkspaceMemberRequest request) {
+        InviteMemberResponse response = invitationService.invite(workspaceId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/{workspaceId}/invitations")
+    @Operation(summary = "Bekleyen Davetleri Listele", description = "Çalışma alanı yöneticisi, süresi dolmamış bekleyen davetleri görür.")
+    public ResponseEntity<List<WorkspaceInvitationResponse>> listInvitations(@PathVariable UUID workspaceId) {
+        return ResponseEntity.ok(invitationService.listPending(workspaceId));
+    }
+
+    @DeleteMapping("/{workspaceId}/invitations/{invitationId}")
+    @Operation(summary = "Daveti İptal Et", description = "Bekleyen bir daveti iptal eder; bağlantı artık çalışmaz.")
+    public ResponseEntity<Void> revokeInvitation(@PathVariable UUID workspaceId, @PathVariable UUID invitationId) {
+        invitationService.revoke(workspaceId, invitationId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{workspaceId}/urls")

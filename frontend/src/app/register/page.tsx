@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { User, Mail, KeyRound, ArrowLeft, Link2, CheckCircle2, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { ApiClient } from '@/lib/api';
@@ -11,6 +11,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+
+  // Invitation links pre-fill the invited email address.
+  useEffect(() => {
+    const invited = new URLSearchParams(window.location.search).get('email');
+    if (invited) setEmail(invited);
+  }, []);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,7 +45,9 @@ export default function RegisterPage() {
 
       setSuccessMsg(res.message || 'Hesabınız oluşturuldu! Giriş sayfasına yönlendiriliyorsunuz...');
       setTimeout(() => {
-        window.location.href = '/login';
+        const redirect = new URLSearchParams(window.location.search).get('redirect');
+        const safe = redirect && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : null;
+        window.location.href = safe ? `/login?redirect=${encodeURIComponent(safe)}` : '/login';
       }, 1500);
     } catch (err: any) {
       setErrorMsg(err.message || 'Üye olma işlemi sırasında hata oluştu.');

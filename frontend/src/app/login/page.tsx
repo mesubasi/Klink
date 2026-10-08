@@ -9,6 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+// Only same-site relative paths are accepted so the redirect parameter cannot be used to leave the site.
+function getSafeRedirect(): string | null {
+  if (typeof window === 'undefined') return null;
+  const target = new URLSearchParams(window.location.search).get('redirect');
+  return target && target.startsWith('/') && !target.startsWith('//') ? target : null;
+}
+
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -34,7 +41,7 @@ export default function LoginPage() {
         setStep('2fa');
         setSuccessMsg('2FA Koruması: Lütfen 6 haneli doğrulama kodunuzu girin.');
       } else {
-        completeLogin(authRes.username, authRes.role);
+        completeLogin(authRes.username, authRes.role, authRes.accessToken);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Kullanıcı adı veya şifre hatalı!');
@@ -58,7 +65,7 @@ export default function LoginPage() {
         code: totpCode.trim(),
       });
 
-      completeLogin(res.username, res.role);
+      completeLogin(res.username, res.role, res.accessToken);
     } catch (err: any) {
       setErrorMsg(err.message || 'Geçersiz 2FA doğrulama kodu!');
     } finally {
@@ -66,15 +73,15 @@ export default function LoginPage() {
     }
   };
 
-  const completeLogin = (userUsername: string, role: string) => {
-    localStorage.setItem('klink_user', JSON.stringify({ u: userUsername, p: password.trim(), role }));
-    localStorage.setItem('swiftlink_user', JSON.stringify({ u: userUsername, p: password.trim(), role }));
+  const completeLogin = (userUsername: string, role: string, token?: string) => {
+    localStorage.setItem('klink_user', JSON.stringify({ u: userUsername, p: password.trim(), role, token }));
+    localStorage.setItem('swiftlink_user', JSON.stringify({ u: userUsername, p: password.trim(), role, token }));
     setSuccessMsg(`Giriş başarılı! Yönlendiriliyorsunuz...`);
     setTimeout(() => {
       if (role === 'ROLE_ADMIN') {
         window.location.href = '/admin';
       } else {
-        window.location.href = '/dashboard';
+        window.location.href = getSafeRedirect() || '/dashboard';
       }
     }, 1000);
   };
@@ -270,7 +277,7 @@ export default function LoginPage() {
           <CardFooter className="justify-center border-t border-zinc-100 pt-4 flex flex-col gap-2 text-center">
             <p className="text-xs text-zinc-500">
               Hesabınız yok mu?{' '}
-              <Link href="/register" className="font-semibold text-zinc-950 hover:underline">
+              <Link href={typeof window !== 'undefined' && getSafeRedirect() ? `/register?redirect=${encodeURIComponent(getSafeRedirect() as string)}` : '/register'} className="font-semibold text-zinc-950 hover:underline">
                 Kayıt Olun
               </Link>
             </p>

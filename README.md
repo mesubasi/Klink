@@ -215,6 +215,14 @@ Each workspace has three roles. The workspace `ADMIN` (the creator, e.g. a manag
 
 Permissions follow the role, not link ownership: a member who created a link is still bound by the matrix, and someone removed from the workspace loses access to its links. Personal links (no workspace) are limited to their owner. `canCustomizeQr` is stored but not enforced, because QR images are public. Denied requests return `403`.
 
+### 🏢 Customers, Invitations & Platform Admins
+
+Klink is multi-tenant: every customer company is a workspace. The person who creates it becomes its `ADMIN` and can bring in their own staff:
+
+- **Invite by email** (`POST /api/v1/workspaces/{id}/invitations`): an already registered email is added immediately; otherwise a single-use invitation link (valid for `INVITATION_EXPIRY_DAYS`, default 7) is emailed. The link only works for the invited address, only the SHA-256 hash of its token is stored, and re-inviting or revoking invalidates older links. If SMTP is not configured the link is shown to the inviter instead. Invitees open `/invite/{token}`, register or log in, and accept.
+- **Platform admins (`ROLE_ADMIN`)** see every workspace under `GET /api/v1/admin/workspaces` (the **Müşteriler** tab of the admin panel) and can read and manage any workspace — members, invitations, permission matrix, links — without being a member.
+- Set `FRONTEND_INVITE_URL` (default `https://klink.to/invite/%s`) so emailed links point at your frontend.
+
 ### 📈 Metrics
 
 Prometheus metrics are exposed at `/actuator/prometheus` and require an admin JWT (`Authorization: Bearer <token>`):

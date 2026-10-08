@@ -30,7 +30,8 @@ import {
   WorkspaceRole, 
   ShortenResponse,
   WorkspacePermissionMatrixResponse,
-  RolePermissionDto 
+  RolePermissionDto,
+  WorkspaceInvitationResponse
 } from '@/lib/types';
 import { ApiClient } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,8 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
   const [workspaceUrls, setWorkspaceUrls] = useState<ShortenResponse[]>([]);
   const [permissionMatrix, setPermissionMatrix] = useState<WorkspacePermissionMatrixResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [invitations, setInvitations] = useState<WorkspaceInvitationResponse[]>([]);
+  const [manualInviteUrl, setManualInviteUrl] = useState<string | null>(null);
   const [savingMatrix, setSavingMatrix] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -103,6 +106,12 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
 
       const matrix = await ApiClient.getWorkspacePermissionMatrix(wsId, 'tr', authUser);
       setPermissionMatrix(matrix);
+
+      if (details.currentUserRole === 'ADMIN') {
+        setInvitations(await ApiClient.getWorkspaceInvitations(wsId, 'tr', authUser));
+      } else {
+        setInvitations([]);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Çalışma alanı detayları alınamadı.');
     }
@@ -163,17 +172,36 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
     if (!authUser || !selectedWorkspace || !inviteEmail.trim()) return;
     setErrorMsg(null);
     try {
-      await ApiClient.addWorkspaceMember(selectedWorkspace.id, {
+      const result = await ApiClient.inviteWorkspaceMember(selectedWorkspace.id, {
         email: inviteEmail.trim(),
         role: inviteRole,
       }, 'tr', authUser);
 
-      setSuccessMsg(`${inviteEmail} takıma ${inviteRole} rolü ile davet edildi.`);
+      if (result.outcome === 'ADDED') {
+        setSuccessMsg(`${inviteEmail} zaten kayıtlıydı; takıma ${inviteRole} rolü ile eklendi.`);
+      } else if (result.emailSent) {
+        setSuccessMsg(`${inviteEmail} adresine davet e-postası gönderildi (7 gün geçerli).`);
+      } else {
+        setSuccessMsg(`${inviteEmail} için davet oluşturuldu, ancak e-posta gönderilemedi. Aşağıdaki bağlantıyı kişiye iletin.`);
+        setManualInviteUrl(result.inviteUrl || null);
+      }
       setInviteEmail('');
       setIsInviteModalOpen(false);
       selectWorkspace(selectedWorkspace.id);
     } catch (err: any) {
       setErrorMsg(err.message || 'Üye davet edilirken hata oluştu.');
+    }
+  };
+
+  const handleRevokeInvitation = async (invitationId: string) => {
+    if (!authUser || !selectedWorkspace) return;
+    setErrorMsg(null);
+    try {
+      await ApiClient.revokeWorkspaceInvitation(selectedWorkspace.id, invitationId, 'tr', authUser);
+      setInvitations((prev) => prev.filter((i) => i.id !== invitationId));
+      setSuccessMsg('Davet iptal edildi; bağlantı artık çalışmaz.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Davet iptal edilemedi.');
     }
   };
 
@@ -428,6 +456,75 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
             </Card>
           )}
 
+          {activeTab === 'members' && isCurrentAdmin && manualInviteUrl && (
+            <Card className="bg-amber-950/20 border-amber-500/30">
+              <CardContent className="p-4 space-y-2">
+                <p className="text-xs text-amber-200">
+                  E-posta sunucusu yapılandırılmadığı için davet gönderilemedi. Bu bağlantıyı yalnızca davet ettiğiniz kişiyle paylaşın; bir daha gösterilmeyecek.
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate rounded bg-zinc-900 px-2 py-1.5 text-[11px] text-amber-100">{manualInviteUrl}</code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
+                    onClick={() => navigator.clipboard.writeText(manualInviteUrl)}
+                  >
+                    Kopyala
+                  </Button>
+                  <Button size="sm" variant="ghost" className="text-xs text-zinc-400" onClick={() => setManualInviteUrl(null)}>
+                    Kapat
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'members' && isCurrentAdmin && invitations.length > 0 && (
+            <Card className="bg-zinc-900/60 border-zinc-800">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold text-white">Bekleyen Davetler ({invitations.length})</CardTitle>
+                <CardDescription className="text-xs text-zinc-400">
+                  Henüz kabul edilmemiş davetler. Kişi kayıt olup bağlantıyı açtığında çalışma alanına katılır.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-zinc-800 hover:bg-transparent">
+                      <TableHead className="text-zinc-400 text-xs">E-posta</TableHead>
+                      <TableHead className="text-zinc-400 text-xs">Rol</TableHead>
+                      <TableHead className="text-zinc-400 text-xs">Son Geçerlilik</TableHead>
+                      <TableHead className="text-right text-zinc-400 text-xs">İşlem</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invitations.map((inv) => (
+                      <TableRow key={inv.id} className="border-zinc-800/60 hover:bg-zinc-800/30">
+                        <TableCell className="text-xs text-white">{inv.email}</TableCell>
+                        <TableCell>
+                          <Badge className="text-xs bg-zinc-800 text-zinc-300 border-zinc-700">{inv.role}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-zinc-500">{new Date(inv.expiresAt).toLocaleDateString('tr-TR')}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRevokeInvitation(inv.id)}
+                            className="h-7 w-7 p-0 text-zinc-400 hover:text-red-400 hover:bg-red-500/10"
+                            title="Daveti İptal Et"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Tab 2: Workspace URLs */}
           {activeTab === 'urls' && (
             <Card className="bg-zinc-900/60 border-zinc-800">
@@ -659,12 +756,12 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
               <UserPlus className="w-5 h-5 text-emerald-400" /> Ekip Üyesi Davet Et
             </DialogTitle>
             <DialogDescription className="text-xs text-zinc-400">
-              Kullanıcının sistemde kayıtlı e-posta adresini girerek çalışma alanına dahil edin.
+              Çalışanın e-posta adresini girin. Kayıtlıysa doğrudan eklenir; değilse 7 gün geçerli, tek kullanımlık bir davet bağlantısı e-posta ile gönderilir.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleInviteMember} className="space-y-4 mt-2">
             <div>
-              <label className="text-xs font-medium text-zinc-300">Kullanıcı E-posta Adresi *</label>
+              <label className="text-xs font-medium text-zinc-300">Çalışan E-posta Adresi *</label>
               <Input
                 type="email"
                 value={inviteEmail}

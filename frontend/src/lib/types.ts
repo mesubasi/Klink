@@ -413,3 +413,34 @@ export interface LinkStatsResponse {
   brokenCount: number;
   healthyCount: number;
 }
+
+export interface WorkspaceInvitationResponse {
+  id: string;
+  email: string;
+  role: WorkspaceRole;
+  invitedBy?: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface InviteMemberResponse {
+  outcome: 'ADDED' | 'INVITED';
+  member?: WorkspaceMemberResponse;
+  invitation?: WorkspaceInvitationResponse;
+  emailSent: boolean;
+  inviteUrl?: string;
+}
+
+export interface InvitationPreviewResponse {
+  workspaceName: string;
+  email: string;
+  role: WorkspaceRole;
+  invitedBy?: string;
+  expiresAt: number;
+}
+
+export interface AcceptInvitationResponse {
+  workspaceId: string;
+  workspaceName: string;
+  role: WorkspaceRole;
+}
