@@ -29,7 +29,8 @@ import {
   Check,
   X,
   ExternalLink,
-  Code2
+  Code2,
+  ShieldCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import { Language } from '@/lib/translations';
@@ -48,12 +49,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { AuditLogTable } from '@/components/AuditLogTable';
 
 export default function AdminCrmPage() {
   const [lang] = useState<Language>('tr');
   const [adminAuth, setAdminAuth] = useState<{ u: string; p: string; token?: string; role?: string } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'system' | 'users' | 'links' | 'workspaces' | 'api-keys'>('system');
+  const [activeSubTab, setActiveSubTab] = useState<'system' | 'users' | 'links' | 'workspaces' | 'audit' | 'api-keys'>('system');
 
   const [allLinks, setAllLinks] = useState<ShortenResponse[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKeyResponse[]>([]);
@@ -71,6 +73,7 @@ export default function AdminCrmPage() {
   const [systemStatus, setSystemStatus] = useState<SystemStatusResponse | null>(null);
   const [usersList, setUsersList] = useState<UserDto[]>([]);
   const [workspaceList, setWorkspaceList] = useState<WorkspaceResponse[]>([]);
+  const [auditActions, setAuditActions] = useState<string[]>([]);
   const [customerForm, setCustomerForm] = useState({ name: '', managerEmail: '', maxMembers: '', maxLinks: '' });
   const [customerResult, setCustomerResult] = useState<ProvisionCustomerResponse | null>(null);
   const [customerError, setCustomerError] = useState('');
@@ -109,6 +112,7 @@ export default function AdminCrmPage() {
         ApiClient.getAllWorkspaces(lang, adminAuth as any)
       ]);
       setWorkspaceList(workspaces);
+      setAuditActions(await ApiClient.getAuditActions(lang, adminAuth as any));
       setAllLinks(links);
       if (telemetry) {
         setSystemStatus(telemetry);
@@ -492,6 +496,10 @@ export default function AdminCrmPage() {
             <TabsTrigger value="workspaces" className="flex items-center gap-1.5 text-xs font-semibold">
               <Users className="w-3.5 h-3.5" />
               <span>Müşteriler ({workspaceList.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="flex items-center gap-1.5 text-xs font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Denetim Kaydı</span>
             </TabsTrigger>
             <TabsTrigger value="api-keys" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-950">
               <KeyRound className="w-3.5 h-3.5" />
@@ -882,6 +890,23 @@ export default function AdminCrmPage() {
           </TabsContent>
 
           {/* Sub-tab 3: Global Link Overseer Table */}
+          <TabsContent value="audit">
+            <Card className="border-zinc-200/90 shadow-sm overflow-hidden bg-white">
+              <CardHeader className="border-b border-zinc-100 pb-4 bg-zinc-50/40">
+                <CardTitle className="text-base font-bold text-zinc-950">Denetim Kaydı</CardTitle>
+                <CardDescription className="text-xs mt-0.5 text-zinc-500">
+                  Platformdaki girişler, yönetici işlemleri ve müşteri verilerine yapılan erişimler. Kayıtlar değiştirilemez; en yeni olay önce gelir.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <AuditLogTable
+                  actions={auditActions}
+                  load={(query) => ApiClient.searchAdminAudit(query, lang, adminAuth as any)}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="workspaces">
             <Card className="border-zinc-200/90 shadow-sm overflow-hidden bg-white">
               <CardHeader className="border-b border-zinc-100 pb-4 bg-zinc-50/40">

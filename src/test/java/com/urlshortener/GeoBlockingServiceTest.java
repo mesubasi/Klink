@@ -74,6 +74,9 @@ public class GeoBlockingServiceTest {
     @Mock
     private com.urlshortener.service.QuotaService quotaService;
 
+    @Mock
+    private com.urlshortener.service.AuditService auditService;
+
     @InjectMocks
     private UrlShortenerService urlShortenerService;
 

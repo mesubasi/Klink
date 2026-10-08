@@ -33,13 +33,16 @@ public class WorkspacePermissionService {
     private final UserRepository userRepository;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
+    private final AuditService auditService;
 
     public WorkspacePermissionService(WorkspacePermissionPolicyRepository policyRepository,
                                       WorkspaceRepository workspaceRepository,
                                       WorkspaceMemberRepository memberRepository,
                                       UserRepository userRepository,
                                       RedisTemplate<String, Object> redisTemplate,
-                                      ObjectMapper objectMapper) {
+                                      ObjectMapper objectMapper,
+                                      AuditService auditService) {
+        this.auditService = auditService;
         this.policyRepository = policyRepository;
         this.workspaceRepository = workspaceRepository;
         this.memberRepository = memberRepository;
@@ -126,6 +129,9 @@ public class WorkspacePermissionService {
                         .build());
         applyDtoToPolicy(viewerPolicy, request.getViewer());
         policyRepository.save(viewerPolicy);
+
+        auditService.record(AuditAction.PERMISSIONS_UPDATED, "WORKSPACE", workspaceId.toString(), workspaceId,
+                "member=" + summarize(request.getMember()) + " viewer=" + summarize(request.getViewer()));
 
         // 3. Redis Cache Invalidation & Yenileme
         String cacheKey = REDIS_PREFIX + workspaceId.toString();
@@ -269,6 +275,14 @@ public class WorkspacePermissionService {
         );
     }
 
+    private static String summarize(RolePermissionDto p) {
+        if (p == null) {
+            return "-";
+        }
+        return "create=" + p.isCanCreateLink() + ",delete=" + p.isCanDeleteLink() + ",analytics=" + p.isCanViewAnalytics()
+                + ",export=" + p.isCanExportReports() + ",qr=" + p.isCanCustomizeQr() + ",webhooks=" + p.isCanManageWebhooks();
+    }
+
     private boolean isSystemAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null && auth.getAuthorities().stream()
@@ -281,9 +295,13 @@ public class WorkspacePermissionService {
         }
 
         WorkspaceMember member = memberRepository.findByWorkspaceIdAndUserId(workspaceId, user.getId())
-                .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
+                .orElseThrow(() -> {
+                    auditService.denied(AuditAction.PERMISSIONS_UPDATED, "WORKSPACE", workspaceId.toString(), workspaceId);
+                    return new SecurityException("Bu çalışma alanının üyesi değilsiniz.");
+                });
 
         if (member.getRole() != WorkspaceRole.ADMIN) {
+            auditService.denied(AuditAction.PERMISSIONS_UPDATED, "WORKSPACE", workspaceId.toString(), workspaceId);
             throw new SecurityException("İzin matrisini yönetmek için Çalışma Alanı Yöneticisi (WORKSPACE_ADMIN) yetkisi gereklidir.");
         }
     }
@@ -291,10 +309,14 @@ public class WorkspacePermissionService {
     /** Matrix lookup for API callers: only workspace members and system admins may read a workspace's permissions. */
     @Transactional(readOnly = true)
     public WorkspacePermissionMatrixResponse getPermissionMatrixForCurrentUser(UUID workspaceId) {
-        if (!isSystemAdmin()) {
-            UserAccount currentUser = getCurrentAuthenticatedUser();
-            memberRepository.findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
-                    .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
+        UserAccount currentUser = getCurrentAuthenticatedUser();
+        boolean member = memberRepository.findByWorkspaceIdAndUserId(workspaceId, currentUser.getId()).isPresent();
+        if (!member) {
+            if (!isSystemAdmin()) {
+                auditService.denied("permission matrix", "WORKSPACE", workspaceId.toString(), workspaceId);
+                throw new SecurityException("Bu çalışma alanının üyesi değilsiniz.");
+            }
+            auditService.record(AuditAction.ADMIN_VIEWED_PERMISSIONS, "WORKSPACE", workspaceId.toString(), workspaceId, null);
         }
         return getPermissionMatrix(workspaceId);
     }

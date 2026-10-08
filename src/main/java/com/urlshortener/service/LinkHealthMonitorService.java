@@ -70,7 +70,7 @@ public class LinkHealthMonitorService {
             mapping.setHealthResponseTimeMs(0L);
             UrlMapping saved = urlMappingRepository.save(mapping);
             if (!"BROKEN".equals(oldStatus)) {
-                emailService.sendBrokenLinkAlert(saved);
+                emailService.sendBrokenLinkAlert(EmailService.BrokenLinkAlert.from(saved));
             }
             return saved;
         }
@@ -163,7 +163,7 @@ public class LinkHealthMonitorService {
 
         // Durum geçişi kontrolü: Yalnızca link ilk çöktüğü an (HEALTHY/UNKNOWN/DEGRADED -> BROKEN) uyarı gönder
         if ("BROKEN".equals(healthStatus) && !"BROKEN".equals(oldStatus)) {
-            emailService.sendBrokenLinkAlert(saved);
+            emailService.sendBrokenLinkAlert(EmailService.BrokenLinkAlert.from(saved));
         }
 
         return saved;

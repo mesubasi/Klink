@@ -127,6 +127,6 @@ public class TelemetryControllerTest {
     @Test
     public void unauthenticatedRequest_ShouldBeDenied() throws Exception {
         mockMvc.perform(get("/api/v1/telemetry/recent"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 }

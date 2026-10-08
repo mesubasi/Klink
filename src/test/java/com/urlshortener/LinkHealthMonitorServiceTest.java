@@ -82,7 +82,7 @@ public class LinkHealthMonitorServiceTest {
         linkHealthMonitorService.checkUrlHealth(mapping);
 
         org.mockito.Mockito.verify(emailService, org.mockito.Mockito.times(1))
-                .sendBrokenLinkAlert(any(UrlMapping.class));
+                .sendBrokenLinkAlert(any());
     }
 
     @Test
@@ -99,6 +99,6 @@ public class LinkHealthMonitorServiceTest {
 
         // Link zaten BROKEN olduğu için tekrar mail ATILMAMALI (Spam engeli)
         org.mockito.Mockito.verify(emailService, org.mockito.Mockito.never())
-                .sendBrokenLinkAlert(any(UrlMapping.class));
+                .sendBrokenLinkAlert(any());
     }
 }

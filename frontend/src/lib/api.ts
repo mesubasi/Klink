@@ -7,6 +7,8 @@ import {
   InvitationPreviewResponse,
   AcceptInvitationResponse,
   CreateCustomerRequest,
+  AuditEventResponse,
+  AuditQuery,
   ProvisionCustomerResponse,
   LinkStatsResponse,
   BulkShortenRequest, 
@@ -72,9 +74,32 @@ export class ApiClient {
     return headers;
   }
 
+  /**
+   * A 401 on a request that carried credentials means the session expired or was revoked
+   * (password reset, "sign out everywhere"): drop it and send the user to the login page.
+   * Requests without credentials (e.g. a wrong password on the login form) are left alone.
+   */
+  private static handleExpiredSession(res: Response, options: RequestInit): void {
+    if (res.status !== 401 || typeof window === 'undefined') return;
+    const headers = (options.headers || {}) as Record<string, string>;
+    if (!headers['Authorization']) return;
+    const path = window.location.pathname;
+    if (path.startsWith('/login') || path.startsWith('/admin/login') || path.startsWith('/register')) return;
+    try {
+      localStorage.removeItem('klink_user');
+      localStorage.removeItem('swiftlink_user');
+    } catch {
+      // storage unavailable; the redirect below still ends the broken session
+    }
+    const loginPath = path.startsWith('/admin') ? '/admin/login' : '/login';
+    window.location.href = `${loginPath}?redirect=${encodeURIComponent(path)}`;
+  }
+
   private static async safeFetch(url: string, options: RequestInit): Promise<Response | null> {
     try {
-      return await fetch(url, options);
+      const res = await fetch(url, options);
+      this.handleExpiredSession(res, options);
+      return res;
     } catch (err) {
       console.warn(`[Klink API Warning] Could not reach backend server at ${url}.`);
       return null;
@@ -1104,6 +1129,41 @@ export class ApiClient {
     }
 
     return await res.json();
+  }
+
+  // 31.10 Audit trail
+  private static auditQueryString(query: AuditQuery): string {
+    const params = new URLSearchParams();
+    if (query.actor) params.set('actor', query.actor);
+    if (query.action) params.set('action', query.action);
+    if (query.outcome) params.set('outcome', query.outcome);
+    if (query.from !== undefined) params.set('from', String(query.from));
+    if (query.to !== undefined) params.set('to', String(query.to));
+    params.set('page', String(query.page ?? 0));
+    params.set('size', String(query.size ?? 25));
+    return params.toString();
+  }
+
+  private static async getAudit(url: string, lang: string, authUser?: { u?: string; p?: string; token?: string }): Promise<PagedResponse<AuditEventResponse>> {
+    const res = await this.safeFetch(url, { headers: this.getHeaders(lang, authUser) });
+    if (!res || !res.ok) {
+      const errorData = await res?.json().catch(() => null);
+      throw new Error(errorData?.message || 'Denetim kaydı alınamadı.');
+    }
+    return await res.json();
+  }
+
+  static searchAdminAudit(query: AuditQuery, lang: string = 'tr', authUser?: { u?: string; p?: string; token?: string }) {
+    return this.getAudit(`${API_BASE_URL}/admin/audit?${this.auditQueryString(query)}`, lang, authUser);
+  }
+
+  static searchWorkspaceAudit(workspaceId: string, query: AuditQuery, lang: string = 'tr', authUser?: { u?: string; p?: string; token?: string }) {
+    return this.getAudit(`${API_BASE_URL}/workspaces/${workspaceId}/audit?${this.auditQueryString(query)}`, lang, authUser);
+  }
+
+  static async getAuditActions(lang: string = 'tr', authUser?: { u?: string; p?: string; token?: string }): Promise<string[]> {
+    const res = await this.safeFetch(`${API_BASE_URL}/admin/audit/actions`, { headers: this.getHeaders(lang, authUser) });
+    return res && res.ok ? await res.json() : [];
   }
 
   // 31.9 Email verification and password reset

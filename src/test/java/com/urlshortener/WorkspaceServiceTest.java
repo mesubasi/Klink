@@ -44,6 +44,9 @@ public class WorkspaceServiceTest {
     @Mock
     private com.urlshortener.service.EmailVerificationPolicy verificationPolicy;
 
+    @Mock
+    private com.urlshortener.service.AuditService auditService;
+
     @InjectMocks
     private WorkspaceService workspaceService;
 

@@ -56,7 +56,7 @@ class LinkPermissionTest {
 
         service = new WorkspacePermissionService(
                 mock(WorkspacePermissionPolicyRepository.class), mock(WorkspaceRepository.class),
-                memberRepository, mock(UserRepository.class), redis, new ObjectMapper());
+                memberRepository, mock(UserRepository.class), redis, new ObjectMapper(), mock(com.urlshortener.service.AuditService.class));
 
         workspaceId = UUID.randomUUID();
         workspace = Workspace.builder().id(workspaceId).name("A Firması").slug("a-firmasi").build();

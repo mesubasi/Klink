@@ -7,11 +7,11 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-klinkdb}
       POSTGRES_USER: ${DATABASE_USERNAME:-klink_admin}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-klink_secret_password}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "${DATABASE_PORT:-5433}:5432"
+      - "127.0.0.1:${DATABASE_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-klink_admin} -d ${DB_NAME:-klinkdb}"]
       interval: 10s
@@ -27,7 +27,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "${REDIS_PORT:-6380}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -41,12 +41,12 @@ services:
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-klink_mq}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-klink_mq_pass}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 15s
@@ -71,14 +71,14 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       DATABASE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-klinkdb}
       DATABASE_USERNAME: ${DATABASE_USERNAME:-klink_admin}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-klink_secret_password}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-klink_mq}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-klink_mq_pass}
-      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (base64, at least 256 bits - generate with openssl rand -base64 32)}
       APP_DOMAIN: ${APP_DOMAIN:-http://localhost:8080}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000}
       GOOGLE_SAFE_BROWSING_API_KEY: ${GOOGLE_SAFE_BROWSING_API_KEY:-}

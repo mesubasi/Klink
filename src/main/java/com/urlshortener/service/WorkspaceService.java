@@ -1,6 +1,7 @@
 package com.urlshortener.service;
 
 import com.urlshortener.dto.*;
+import com.urlshortener.model.AuditAction;
 import com.urlshortener.model.*;
 import com.urlshortener.repository.UrlMappingRepository;
 import com.urlshortener.repository.UserRepository;
@@ -28,6 +29,7 @@ public class WorkspaceService {
     private final UrlMappingRepository urlMappingRepository;
     private final QuotaService quotaService;
     private final EmailVerificationPolicy verificationPolicy;
+    private final AuditService auditService;
 
     @Value("${app.domain:http://localhost:8080}")
     private String domain;
@@ -37,7 +39,9 @@ public class WorkspaceService {
                             UserRepository userRepository,
                             UrlMappingRepository urlMappingRepository,
                             QuotaService quotaService,
-                            EmailVerificationPolicy verificationPolicy) {
+                            EmailVerificationPolicy verificationPolicy,
+                            AuditService auditService) {
+        this.auditService = auditService;
         this.quotaService = quotaService;
         this.verificationPolicy = verificationPolicy;
         this.workspaceRepository = workspaceRepository;
@@ -75,6 +79,7 @@ public class WorkspaceService {
 
         workspaceMemberRepository.save(ownerMember);
 
+        auditService.record(AuditAction.WORKSPACE_CREATED, "WORKSPACE", workspace.getId().toString(), workspace.getId(), "name=" + workspace.getName());
         log.info("Yeni çalışma alanı oluşturuldu: {} (Yönetici: {})", workspace.getName(), currentUser.getUsername());
 
         return WorkspaceResponse.builder()
@@ -152,6 +157,8 @@ public class WorkspaceService {
         workspace.setMaxMembers(QuotaService.normalize(maxMembers));
         workspace.setMaxLinks(QuotaService.normalize(maxLinks));
         workspaceRepository.save(workspace);
+        auditService.record(AuditAction.QUOTA_UPDATED, "WORKSPACE", workspaceId.toString(), workspaceId,
+                "maxMembers=" + workspace.getMaxMembers() + " maxLinks=" + workspace.getMaxLinks() + " (null = unlimited)");
         return toAdminResponse(workspace);
     }
 
@@ -173,7 +180,10 @@ public class WorkspaceService {
         if (maxMembers != null) workspace.setMaxMembers(QuotaService.normalize(maxMembers));
         if (maxLinks != null) workspace.setMaxLinks(QuotaService.normalize(maxLinks));
         log.info("Platform yöneticisi müşteri çalışma alanı oluşturdu: {} ({})", workspace.getName(), admin.getUsername());
-        return workspaceRepository.save(workspace);
+        Workspace saved = workspaceRepository.save(workspace);
+        auditService.record(AuditAction.CUSTOMER_CREATED, "WORKSPACE", saved.getId().toString(), saved.getId(),
+                "name=" + saved.getName() + " maxMembers=" + saved.getMaxMembers() + " maxLinks=" + saved.getMaxLinks());
+        return saved;
     }
 
     public WorkspaceResponse toAdminResponse(Workspace w) {
@@ -202,8 +212,10 @@ public class WorkspaceService {
                 .map(WorkspaceMember::getRole)
                 .orElseGet(() -> {
                     if (isSystemAdmin()) {
+                        auditService.record(AuditAction.ADMIN_VIEWED_WORKSPACE, "WORKSPACE", workspaceId.toString(), workspaceId, "name=" + workspace.getName());
                         return WorkspaceRole.ADMIN;
                     }
+                    auditService.denied("workspace details", "WORKSPACE", workspaceId.toString(), workspaceId);
                     throw new SecurityException("Bu çalışma alanına erişim yetkiniz bulunmamaktadır.");
                 });
 
@@ -251,6 +263,8 @@ public class WorkspaceService {
                 .build();
 
         newMember = workspaceMemberRepository.save(newMember);
+        auditService.record(AuditAction.MEMBER_ADDED, "USER", targetUser.getUsername(), workspaceId,
+                "role=" + newMember.getRole() + " email=" + targetUser.getEmail() + outsideAdminNote(workspaceId));
         log.info("Çalışma alanına üye eklendi: {} -> {} ({})", targetUser.getUsername(), workspace.getName(), newMember.getRole());
 
         return buildMemberResponse(newMember);
@@ -272,8 +286,11 @@ public class WorkspaceService {
             }
         }
 
+        WorkspaceRole previousRole = targetMembership.getRole();
         targetMembership.setRole(request.getRole());
         targetMembership = workspaceMemberRepository.save(targetMembership);
+        auditService.record(AuditAction.MEMBER_ROLE_CHANGED, "USER", targetMembership.getUser().getUsername(), workspaceId,
+                previousRole + " -> " + targetMembership.getRole() + outsideAdminNote(workspaceId));
 
         log.info("Çalışma alanı üye rolü güncellendi: {} -> {}", targetMembership.getUser().getUsername(), targetMembership.getRole());
 
@@ -291,6 +308,7 @@ public class WorkspaceService {
                     .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
 
             if (!isSelfLeaving && callerMembership.getRole() != WorkspaceRole.ADMIN) {
+                auditService.denied(AuditAction.MEMBER_REMOVED, "USER", userId.toString(), workspaceId);
                 throw new SecurityException("Üye çıkarmak için Çalışma Alanı Yöneticisi (WORKSPACE_ADMIN) yetkisi gereklidir.");
             }
         }
@@ -306,6 +324,8 @@ public class WorkspaceService {
         }
 
         workspaceMemberRepository.deleteByWorkspaceIdAndUserId(workspaceId, userId);
+        auditService.record(AuditAction.MEMBER_REMOVED, "USER", targetMembership.getUser().getUsername(), workspaceId,
+                (isSelfLeaving ? "left the workspace" : "removed") + outsideAdminNote(workspaceId));
         log.info("Üye çalışma alanından çıkarıldı: userId={} workspaceId={}", userId, workspaceId);
     }
 
@@ -314,9 +334,16 @@ public class WorkspaceService {
         UserAccount currentUser = getCurrentAuthenticatedUser();
 
         // Çalışma alanına üyelik kontrolü (Admin, Member veya Viewer olabilir)
-        if (!isSystemAdmin()) {
+        if (isSystemAdmin()) {
+            if (!workspaceMemberRepository.existsByWorkspaceIdAndUserUsername(workspaceId, currentUser.getUsername())) {
+                auditService.record(AuditAction.ADMIN_VIEWED_WORKSPACE_LINKS, "WORKSPACE", workspaceId.toString(), workspaceId, null);
+            }
+        } else {
             workspaceMemberRepository.findByWorkspaceIdAndUserUsername(workspaceId, currentUser.getUsername())
-                    .orElseThrow(() -> new SecurityException("Bu çalışma alanının linklerini görüntüleme yetkiniz bulunmamaktadır."));
+                    .orElseThrow(() -> {
+                        auditService.denied("workspace links", "WORKSPACE", workspaceId.toString(), workspaceId);
+                        return new SecurityException("Bu çalışma alanının linklerini görüntüleme yetkiniz bulunmamaktadır.");
+                    });
         }
 
         List<UrlMapping> mappings = urlMappingRepository.findByWorkspaceId(workspaceId);
@@ -373,11 +400,24 @@ public class WorkspaceService {
         }
 
         WorkspaceMember member = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, user.getId())
-                .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
+                .orElseThrow(() -> {
+                    auditService.denied("workspace admin action", "WORKSPACE", workspaceId.toString(), workspaceId);
+                    return new SecurityException("Bu çalışma alanının üyesi değilsiniz.");
+                });
 
         if (member.getRole() != WorkspaceRole.ADMIN) {
+            auditService.denied("workspace admin action", "WORKSPACE", workspaceId.toString(), workspaceId);
             throw new SecurityException("Bu işlem için Çalışma Alanı Yöneticisi (WORKSPACE_ADMIN) yetkisi gereklidir.");
         }
+    }
+
+    /** Marks audit entries made by a platform admin who is not part of the customer's workspace. */
+    private String outsideAdminNote(UUID workspaceId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && isSystemAdmin() && !workspaceMemberRepository.existsByWorkspaceIdAndUserUsername(workspaceId, auth.getName())) {
+            return " [platform admin, not a member]";
+        }
+        return "";
     }
 
     private WorkspaceMemberResponse buildMemberResponse(WorkspaceMember member) {

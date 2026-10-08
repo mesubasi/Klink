@@ -39,6 +39,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AuditLogTable } from '@/components/AuditLogTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 interface WorkspaceManagerWidgetProps {
@@ -66,7 +67,7 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>('MEMBER');
 
-  const [activeTab, setActiveTab] = useState<'members' | 'urls' | 'matrix'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'urls' | 'matrix' | 'audit'>('members');
 
   useEffect(() => {
     if (authUser) {
@@ -383,6 +384,18 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
             >
               <ShieldAlert className="w-3.5 h-3.5 text-amber-400" /> 🛡️ İzinler & Güvenlik Matrisi
             </button>
+            {isCurrentAdmin && (
+              <button
+                onClick={() => setActiveTab('audit')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  activeTab === 'audit'
+                    ? 'bg-zinc-800 text-white border border-zinc-700'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5 text-emerald-400" /> Etkinlik Kaydı
+              </button>
+            )}
           </div>
 
           {/* Tab 1: Members Table */}
@@ -527,6 +540,25 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
                     ))}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'audit' && isCurrentAdmin && (
+            <Card className="bg-zinc-900/60 border-zinc-800">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold text-white">Etkinlik Kaydı</CardTitle>
+                <CardDescription className="text-xs text-zinc-400">
+                  Bu çalışma alanında kimin neyi yaptığı: üye ve davet işlemleri, izin değişiklikleri, silinen linkler ve reddedilen erişimler.
+                  Platform yöneticilerinin (PLATFORM) verilerinize yaptığı erişimler de burada görünür. Kayıtlar değiştirilemez.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <AuditLogTable
+                  dark
+                  reloadKey={selectedWorkspace.id}
+                  load={(query) => ApiClient.searchWorkspaceAudit(selectedWorkspace.id, query, 'tr', authUser as any)}
+                />
               </CardContent>
             </Card>
           )}

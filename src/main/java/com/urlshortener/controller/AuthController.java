@@ -150,6 +150,16 @@ public class AuthController {
         return ResponseEntity.ok(user);
     }
 
+    @PostMapping("/logout-all")
+    @Operation(summary = "Tüm Cihazlardaki Oturumları Kapat", description = "Bu hesap için şimdiye kadar verilmiş tüm erişim token'larını geçersiz kılar; her cihazda yeniden giriş gerekir.")
+    public ResponseEntity<java.util.Map<String, String>> logoutEverywhere(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        authService.logoutEverywhere(authentication.getName());
+        return ResponseEntity.ok(java.util.Collections.singletonMap("message", "Tüm cihazlardaki oturumlar kapatıldı. Yeniden giriş yapmanız gerekiyor."));
+    }
+
     @PostMapping("/logout")
     @Operation(summary = "Oturumu Kapat (Logout)", description = "Oturum açmış kullanıcının oturumunu kapatır.")
     @ApiResponse(responseCode = "200", description = "Oturum başarıyla kapatıldı")
