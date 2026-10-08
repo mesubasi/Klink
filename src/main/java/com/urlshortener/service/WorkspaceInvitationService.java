@@ -15,6 +15,7 @@ import com.urlshortener.repository.UserRepository;
 import com.urlshortener.repository.WorkspaceInvitationRepository;
 import com.urlshortener.repository.WorkspaceMemberRepository;
 import com.urlshortener.repository.WorkspaceRepository;
+import com.urlshortener.util.TokenUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,12 +24,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +38,6 @@ public class WorkspaceInvitationService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceInvitationService.class);
     private static final String INVALID_INVITATION = "Davet bağlantısı geçersiz veya süresi dolmuş.";
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final WorkspaceInvitationRepository invitationRepository;
     private final WorkspaceRepository workspaceRepository;
@@ -51,6 +45,8 @@ public class WorkspaceInvitationService {
     private final UserRepository userRepository;
     private final WorkspaceService workspaceService;
     private final EmailService emailService;
+    private final EmailVerificationPolicy verificationPolicy;
+    private final QuotaService quotaService;
 
     @Value("${app.invitation.expiry-days:7}")
     private int expiryDays;
@@ -63,7 +59,11 @@ public class WorkspaceInvitationService {
                                       WorkspaceMemberRepository memberRepository,
                                       UserRepository userRepository,
                                       WorkspaceService workspaceService,
-                                      EmailService emailService) {
+                                      EmailService emailService,
+                                      EmailVerificationPolicy verificationPolicy,
+                                      QuotaService quotaService) {
+        this.quotaService = quotaService;
+        this.verificationPolicy = verificationPolicy;
         this.invitationRepository = invitationRepository;
         this.workspaceRepository = workspaceRepository;
         this.memberRepository = memberRepository;
@@ -87,17 +87,20 @@ public class WorkspaceInvitationService {
                 .orElseThrow(() -> new IllegalArgumentException("Çalışma alanı bulunamadı."));
 
         // Re-inviting replaces the earlier link, which stops working.
-        for (WorkspaceInvitation old : invitationRepository.findByWorkspaceIdAndEmailAndStatus(workspaceId, email, InvitationStatus.PENDING)) {
+        List<WorkspaceInvitation> earlier = invitationRepository.findByWorkspaceIdAndEmailAndStatus(workspaceId, email, InvitationStatus.PENDING);
+        for (WorkspaceInvitation old : earlier) {
             old.setStatus(InvitationStatus.REVOKED);
             invitationRepository.save(old);
         }
+        // Pending invitations occupy a seat, so the replaced ones are not counted twice.
+        quotaService.checkMemberQuota(workspace, earlier.isEmpty() ? 1 : 0);
 
-        String token = generateToken();
+        String token = TokenUtil.generate();
         WorkspaceInvitation invitation = new WorkspaceInvitation();
         invitation.setWorkspace(workspace);
         invitation.setEmail(email);
         invitation.setRole(role);
-        invitation.setTokenHash(hash(token));
+        invitation.setTokenHash(TokenUtil.hash(token));
         invitation.setInvitedBy(inviter);
         invitation.setCreatedAt(System.currentTimeMillis());
         invitation.setExpiresAt(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(expiryDays));
@@ -135,7 +138,7 @@ public class WorkspaceInvitationService {
     /** Public lookup used by the invite page; invalid, used, revoked and expired links all look the same. */
     @Transactional(readOnly = true)
     public InvitationPreviewResponse preview(String token) {
-        WorkspaceInvitation invitation = invitationRepository.findByTokenHash(hash(token))
+        WorkspaceInvitation invitation = invitationRepository.findByTokenHash(TokenUtil.hash(token))
                 .filter(this::isRedeemable)
                 .orElseThrow(() -> new IllegalArgumentException(INVALID_INVITATION));
         return new InvitationPreviewResponse(
@@ -149,8 +152,9 @@ public class WorkspaceInvitationService {
     @Transactional
     public AcceptInvitationResponse accept(String token) {
         UserAccount user = getCurrentAuthenticatedUser();
+        verificationPolicy.requireVerified(user);
 
-        WorkspaceInvitation invitation = invitationRepository.findByTokenHashForUpdate(hash(token))
+        WorkspaceInvitation invitation = invitationRepository.findByTokenHashForUpdate(TokenUtil.hash(token))
                 .filter(this::isRedeemable)
                 .orElseThrow(() -> new IllegalArgumentException(INVALID_INVITATION));
 
@@ -160,6 +164,7 @@ public class WorkspaceInvitationService {
 
         Workspace workspace = invitation.getWorkspace();
         if (!memberRepository.existsByWorkspaceIdAndUserUsername(workspace.getId(), user.getUsername())) {
+            // The invitation already holds a seat, so accepting it never needs extra room.
             memberRepository.save(WorkspaceMember.builder()
                     .workspace(workspace)
                     .user(user)
@@ -183,21 +188,6 @@ public class WorkspaceInvitationService {
     private WorkspaceInvitationResponse toResponse(WorkspaceInvitation i) {
         return new WorkspaceInvitationResponse(i.getId(), i.getEmail(), i.getRole(),
                 i.getInvitedBy() != null ? i.getInvitedBy().getUsername() : null, i.getCreatedAt(), i.getExpiresAt());
-    }
-
-    private static String generateToken() {
-        byte[] bytes = new byte[32];
-        RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    private static String hash(String token) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
     }
 
     private UserAccount getCurrentAuthenticatedUser() {

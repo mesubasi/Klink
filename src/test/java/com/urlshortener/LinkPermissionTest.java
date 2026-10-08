@@ -26,7 +26,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -151,5 +153,30 @@ class LinkPermissionTest {
         assertFalse(service.hasLinkPermission(workspaceLink, "canViewAnalytics"));
         loginAs("anonymousUser", "ROLE_ANONYMOUS");
         assertFalse(service.hasLinkPermission(workspaceLink, "canViewAnalytics"));
+    }
+
+    @Test
+    void uiPermissionsMirrorTheEnforcedOnes() {
+        loginAs("ahmet", "ROLE_USER");
+        joinAs("ahmet", WorkspaceRole.MEMBER);
+        matrix(new RolePermissionDto(true, false, true, true, false, true), RolePermissionDto.defaultViewerPreset());
+
+        RolePermissionDto shown = service.getLinkPermissions(workspaceLink);
+
+        assertFalse(shown.isCanDeleteLink());
+        assertTrue(shown.isCanViewAnalytics());
+        assertEquals(service.hasLinkPermission(workspaceLink, "canDeleteLink"), shown.isCanDeleteLink());
+        assertEquals(service.hasLinkPermission(workspaceLink, "canExportReports"), shown.isCanExportReports());
+    }
+
+    @Test
+    void uiPermissionsAreAllFalseForOutsidersAndNullForAnonymous() {
+        loginAs("dis", "ROLE_USER");
+        when(memberRepository.findByWorkspaceIdAndUserUsername(workspaceId, "dis")).thenReturn(Optional.empty());
+        RolePermissionDto none = service.getLinkPermissions(workspaceLink);
+        assertFalse(none.isCanViewAnalytics() || none.isCanDeleteLink() || none.isCanCreateLink() || none.isCanExportReports());
+
+        SecurityContextHolder.clearContext();
+        assertNull(service.getLinkPermissions(workspaceLink));
     }
 }

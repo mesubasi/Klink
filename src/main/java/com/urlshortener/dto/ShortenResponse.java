@@ -24,6 +24,7 @@ public class ShortenResponse {
     private Long healthResponseTimeMs;
     private String workspaceId;
     private String workspaceName;
+    private RolePermissionDto permissions;
     private boolean abTestingEnabled;
     private java.util.List<UrlVariantResponse> variants;
 
@@ -97,6 +98,7 @@ public class ShortenResponse {
         private Long healthResponseTimeMs;
         private String workspaceId;
         private String workspaceName;
+        private RolePermissionDto permissions;
         private boolean abTestingEnabled;
         private java.util.List<UrlVariantResponse> variants;
 
@@ -123,6 +125,7 @@ public class ShortenResponse {
         public Builder healthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; return this; }
         public Builder workspaceId(String workspaceId) { this.workspaceId = workspaceId; return this; }
         public Builder workspaceName(String workspaceName) { this.workspaceName = workspaceName; return this; }
+        public Builder permissions(RolePermissionDto permissions) { this.permissions = permissions; return this; }
         public Builder abTestingEnabled(boolean abTestingEnabled) { this.abTestingEnabled = abTestingEnabled; return this; }
         public Builder variants(java.util.List<UrlVariantResponse> variants) { this.variants = variants; return this; }
 
@@ -132,6 +135,7 @@ public class ShortenResponse {
             resp.setFallbackUrl(fallbackUrl);
             resp.setWorkspaceId(workspaceId);
             resp.setWorkspaceName(workspaceName);
+            resp.setPermissions(permissions);
             resp.setAbTestingEnabled(abTestingEnabled);
             resp.setVariants(variants);
             return resp;
@@ -178,6 +182,9 @@ public class ShortenResponse {
     public void setHealthResponseTimeMs(Long healthResponseTimeMs) { this.healthResponseTimeMs = healthResponseTimeMs; }
     public String getWorkspaceId() { return workspaceId; }
     public void setWorkspaceId(String workspaceId) { this.workspaceId = workspaceId; }
+    /** What the current user may do with this link (null when unknown, e.g. anonymous callers). */
+    public RolePermissionDto getPermissions() { return permissions; }
+    public void setPermissions(RolePermissionDto permissions) { this.permissions = permissions; }
     public String getWorkspaceName() { return workspaceName; }
     public void setWorkspaceName(String workspaceName) { this.workspaceName = workspaceName; }
     public boolean isAbTestingEnabled() { return abTestingEnabled; }

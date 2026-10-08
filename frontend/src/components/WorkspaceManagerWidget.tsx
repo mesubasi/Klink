@@ -316,11 +316,17 @@ export function WorkspaceManagerWidget({ authUser, onSelectWorkspaceForLinks }: 
 
                 <div className="flex items-center gap-4">
                   <div className="text-center px-4 py-2 bg-zinc-800/60 rounded-lg border border-zinc-700/50">
-                    <div className="text-lg font-bold text-white">{selectedWorkspace.memberCount}</div>
+                    <div className="text-lg font-bold text-white">
+                      {selectedWorkspace.memberCount}
+                      {selectedWorkspace.maxMembers ? <span className="text-xs font-normal text-zinc-400"> / {selectedWorkspace.maxMembers}</span> : null}
+                    </div>
                     <div className="text-xs text-zinc-400">Üye</div>
                   </div>
                   <div className="text-center px-4 py-2 bg-zinc-800/60 rounded-lg border border-zinc-700/50">
-                    <div className="text-lg font-bold text-white">{workspaceUrls.length}</div>
+                    <div className="text-lg font-bold text-white">
+                      {workspaceUrls.length}
+                      {selectedWorkspace.maxLinks ? <span className="text-xs font-normal text-zinc-400"> / {selectedWorkspace.maxLinks}</span> : null}
+                    </div>
                     <div className="text-xs text-zinc-400">Ekip Linki</div>
                   </div>
                   {isCurrentAdmin && (

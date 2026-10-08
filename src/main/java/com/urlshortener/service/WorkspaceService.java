@@ -26,6 +26,8 @@ public class WorkspaceService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
     private final UrlMappingRepository urlMappingRepository;
+    private final QuotaService quotaService;
+    private final EmailVerificationPolicy verificationPolicy;
 
     @Value("${app.domain:http://localhost:8080}")
     private String domain;
@@ -33,7 +35,11 @@ public class WorkspaceService {
     public WorkspaceService(WorkspaceRepository workspaceRepository,
                             WorkspaceMemberRepository workspaceMemberRepository,
                             UserRepository userRepository,
-                            UrlMappingRepository urlMappingRepository) {
+                            UrlMappingRepository urlMappingRepository,
+                            QuotaService quotaService,
+                            EmailVerificationPolicy verificationPolicy) {
+        this.quotaService = quotaService;
+        this.verificationPolicy = verificationPolicy;
         this.workspaceRepository = workspaceRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.userRepository = userRepository;
@@ -43,6 +49,8 @@ public class WorkspaceService {
     @Transactional
     public WorkspaceResponse createWorkspace(CreateWorkspaceRequest request) {
         UserAccount currentUser = getCurrentAuthenticatedUser();
+        verificationPolicy.requireVerified(currentUser);
+        quotaService.checkCanCreateWorkspace(currentUser);
 
         String slug = generateSlug(request.getName().trim());
 
@@ -53,6 +61,7 @@ public class WorkspaceService {
                 .owner(currentUser)
                 .createdAt(System.currentTimeMillis())
                 .build();
+        quotaService.applyDefaults(workspace);
 
         workspace = workspaceRepository.save(workspace);
 
@@ -78,6 +87,8 @@ public class WorkspaceService {
                 .memberCount(1)
                 .linkCount(0)
                 .createdAt(workspace.getCreatedAt())
+                .maxMembers(workspace.getMaxMembers())
+                .maxLinks(workspace.getMaxLinks())
                 .build();
     }
 
@@ -102,6 +113,8 @@ public class WorkspaceService {
                     .memberCount(memberCount)
                     .linkCount(linkCount)
                     .createdAt(w.getCreatedAt())
+                    .maxMembers(w.getMaxMembers())
+                    .maxLinks(w.getMaxLinks())
                     .build();
         }).collect(Collectors.toList());
     }
@@ -121,9 +134,61 @@ public class WorkspaceService {
                 .memberCount(workspaceMemberRepository.countByWorkspaceId(w.getId()))
                 .linkCount(urlMappingRepository.countByWorkspaceId(w.getId()))
                 .createdAt(w.getCreatedAt())
+                .maxMembers(w.getMaxMembers())
+                .maxLinks(w.getMaxLinks())
                 .build())
                 .sorted(Comparator.comparing(WorkspaceResponse::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .collect(Collectors.toList());
+    }
+
+    /** Sets the plan limits of a customer workspace (null or 0 = unlimited). Platform admins only. */
+    @Transactional
+    public WorkspaceResponse updateQuota(UUID workspaceId, Integer maxMembers, Integer maxLinks) {
+        if (!isSystemAdmin()) {
+            throw new SecurityException("Bu işlem için sistem yöneticisi yetkisi gereklidir.");
+        }
+        Workspace workspace = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new IllegalArgumentException("Çalışma alanı bulunamadı."));
+        workspace.setMaxMembers(QuotaService.normalize(maxMembers));
+        workspace.setMaxLinks(QuotaService.normalize(maxLinks));
+        workspaceRepository.save(workspace);
+        return toAdminResponse(workspace);
+    }
+
+    /** Creates a customer workspace owned by the calling platform admin; the manager is added separately. */
+    @Transactional
+    public Workspace createCustomerWorkspace(String name, String description, Integer maxMembers, Integer maxLinks) {
+        if (!isSystemAdmin()) {
+            throw new SecurityException("Bu işlem için sistem yöneticisi yetkisi gereklidir.");
+        }
+        UserAccount admin = getCurrentAuthenticatedUser();
+        Workspace workspace = Workspace.builder()
+                .name(name.trim())
+                .description(description != null && !description.isBlank() ? description.trim() : null)
+                .slug(generateSlug(name.trim()))
+                .owner(admin)
+                .createdAt(System.currentTimeMillis())
+                .build();
+        quotaService.applyDefaults(workspace);
+        if (maxMembers != null) workspace.setMaxMembers(QuotaService.normalize(maxMembers));
+        if (maxLinks != null) workspace.setMaxLinks(QuotaService.normalize(maxLinks));
+        log.info("Platform yöneticisi müşteri çalışma alanı oluşturdu: {} ({})", workspace.getName(), admin.getUsername());
+        return workspaceRepository.save(workspace);
+    }
+
+    public WorkspaceResponse toAdminResponse(Workspace w) {
+        return WorkspaceResponse.builder()
+                .id(w.getId())
+                .name(w.getName())
+                .description(w.getDescription())
+                .slug(w.getSlug())
+                .ownerUsername(w.getOwner().getUsername())
+                .memberCount(workspaceMemberRepository.countByWorkspaceId(w.getId()))
+                .linkCount(urlMappingRepository.countByWorkspaceId(w.getId()))
+                .createdAt(w.getCreatedAt())
+                .maxMembers(w.getMaxMembers())
+                .maxLinks(w.getMaxLinks())
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -168,6 +233,8 @@ public class WorkspaceService {
 
         Workspace workspace = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> new IllegalArgumentException("Çalışma alanı bulunamadı."));
+
+        quotaService.checkMemberQuota(workspace, 1);
 
         UserAccount targetUser = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Belirtilen e-posta adresine sahip kayıtlı kullanıcı bulunamadı: " + request.getEmail()));

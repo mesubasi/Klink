@@ -9,6 +9,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -27,6 +28,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
@@ -64,7 +66,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/bio/{username:[a-zA-Z0-9_-]+}/view", "/api/v1/bio/link/*/click").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/urls/shorten", "/api/v1/urls/bulk-shorten", "/api/v1/urls/*/proceed", "/api/v1/urls/*/verify-password", "/api/v1/urls/qrcode/**").permitAll()
                 // Kullanıcı Kaydı & Girişi (Register, Login, Logout, 2FA Login Verification)
-                .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/2fa/verify-login").permitAll()
+                .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/2fa/verify-login",
+                        "/api/v1/auth/verify-email", "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password").permitAll()
                 // Swagger UI & OpenAPI Dokümanları
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 // Actuator Healthcheck, H2 Konsolu ve Statik Kaynaklar

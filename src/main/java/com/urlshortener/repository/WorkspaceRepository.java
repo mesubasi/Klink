@@ -16,4 +16,6 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, UUID> {
     boolean existsBySlug(String slug);
 
     List<Workspace> findByOwnerUsername(String username);
+
+    long countByOwnerId(UUID ownerId);
 }

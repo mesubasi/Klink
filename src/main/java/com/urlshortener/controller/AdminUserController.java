@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/admin/users")
+@PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "Admin Kullanıcı Yönetimi", description = "Sistemdeki tüm kayıtlı kullanıcıları listeleme, rol değiştirme ve silme servisleri")
 public class AdminUserController {
 
@@ -98,6 +99,7 @@ public class AdminUserController {
                 .email(user.getEmail())
                 .role(user.getRole())
                 .twoFactorEnabled(user.isTwoFactorEnabled())
+                .emailVerified(user.isEmailVerified())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

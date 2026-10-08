@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Language } from '@/lib/translations';
-import { ShortenResponse, UserDto, SystemStatusResponse, ApiKeyResponse, ApiKeyStatus, WorkspaceResponse } from '@/lib/types';
+import { ShortenResponse, UserDto, SystemStatusResponse, ApiKeyResponse, ApiKeyStatus, WorkspaceResponse, ProvisionCustomerResponse } from '@/lib/types';
 import { ApiClient } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,6 +71,11 @@ export default function AdminCrmPage() {
   const [systemStatus, setSystemStatus] = useState<SystemStatusResponse | null>(null);
   const [usersList, setUsersList] = useState<UserDto[]>([]);
   const [workspaceList, setWorkspaceList] = useState<WorkspaceResponse[]>([]);
+  const [customerForm, setCustomerForm] = useState({ name: '', managerEmail: '', maxMembers: '', maxLinks: '' });
+  const [customerResult, setCustomerResult] = useState<ProvisionCustomerResponse | null>(null);
+  const [customerError, setCustomerError] = useState('');
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [quotaEdit, setQuotaEdit] = useState<{ id: string; name: string; maxMembers: string; maxLinks: string } | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('klink_user') || localStorage.getItem('swiftlink_user');
@@ -118,6 +123,57 @@ export default function AdminCrmPage() {
       setErrorMsg(e.message || 'API bağlantı hatası!');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Empty field -> platform default (create) / unlimited (edit); 0 -> unlimited.
+  const parseLimit = (value: string): number | null => {
+    const trimmed = value.trim();
+    if (trimmed === '') return null;
+    const n = Number(trimmed);
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  };
+
+  const handleCreateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminAuth) return;
+    setCreatingCustomer(true);
+    setCustomerError('');
+    setCustomerResult(null);
+    try {
+      const result = await ApiClient.createCustomer(
+        {
+          name: customerForm.name.trim(),
+          managerEmail: customerForm.managerEmail.trim(),
+          maxMembers: parseLimit(customerForm.maxMembers),
+          maxLinks: parseLimit(customerForm.maxLinks),
+        },
+        lang,
+        adminAuth as any
+      );
+      setCustomerResult(result);
+      setCustomerForm({ name: '', managerEmail: '', maxMembers: '', maxLinks: '' });
+      setWorkspaceList(await ApiClient.getAllWorkspaces(lang, adminAuth as any));
+    } catch (err: any) {
+      setCustomerError(err.message || 'Müşteri oluşturulamadı.');
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
+
+  const handleSaveQuota = async () => {
+    if (!adminAuth || !quotaEdit) return;
+    try {
+      const updated = await ApiClient.updateWorkspaceQuota(
+        quotaEdit.id,
+        { maxMembers: parseLimit(quotaEdit.maxMembers), maxLinks: parseLimit(quotaEdit.maxLinks) },
+        lang,
+        adminAuth as any
+      );
+      setWorkspaceList((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+      setQuotaEdit(null);
+    } catch (err: any) {
+      setCustomerError(err.message || 'Kota güncellenemedi.');
     }
   };
 
@@ -835,6 +891,67 @@ export default function AdminCrmPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
+                <form onSubmit={handleCreateCustomer} className="grid gap-2 border-b border-zinc-100 bg-zinc-50/40 p-4 sm:grid-cols-[1.4fr_1.4fr_0.7fr_0.7fr_auto]">
+                  <input
+                    value={customerForm.name}
+                    onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
+                    placeholder="Şirket adı"
+                    required
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs"
+                  />
+                  <input
+                    type="email"
+                    value={customerForm.managerEmail}
+                    onChange={(e) => setCustomerForm({ ...customerForm, managerEmail: e.target.value })}
+                    placeholder="Yönetici e-postası"
+                    required
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs"
+                  />
+                  <input
+                    value={customerForm.maxMembers}
+                    onChange={(e) => setCustomerForm({ ...customerForm, maxMembers: e.target.value })}
+                    placeholder="Maks. üye"
+                    inputMode="numeric"
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs"
+                  />
+                  <input
+                    value={customerForm.maxLinks}
+                    onChange={(e) => setCustomerForm({ ...customerForm, maxLinks: e.target.value })}
+                    placeholder="Maks. link"
+                    inputMode="numeric"
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs"
+                  />
+                  <button
+                    type="submit"
+                    disabled={creatingCustomer}
+                    className="rounded-lg bg-zinc-950 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {creatingCustomer ? 'Oluşturuluyor...' : 'Müşteri Oluştur'}
+                  </button>
+                  <p className="text-[11px] text-zinc-500 sm:col-span-5">
+                    Yönetici kayıtlıysa doğrudan eklenir, değilse e-posta ile davet edilir. Sınır alanları boş bırakılırsa platform varsayılanı, 0 girilirse sınırsız olur.
+                  </p>
+                </form>
+
+                {customerError && (
+                  <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">{customerError}</div>
+                )}
+                {customerResult && (
+                  <div className="border-b border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-900 space-y-1">
+                    <p>
+                      <strong>{customerResult.workspace.name}</strong> oluşturuldu.{' '}
+                      {customerResult.manager.outcome === 'ADDED'
+                        ? 'Yönetici zaten kayıtlıydı ve doğrudan eklendi.'
+                        : customerResult.manager.emailSent
+                          ? 'Yöneticiye davet e-postası gönderildi.'
+                          : 'E-posta gönderilemedi; davet bağlantısını yöneticiye kendiniz iletin:'}
+                    </p>
+                    {customerResult.manager.inviteUrl && (
+                      <code className="block break-all rounded bg-white px-2 py-1.5 text-[11px]">{customerResult.manager.inviteUrl}</code>
+                    )}
+                  </div>
+                )}
+
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -843,12 +960,13 @@ export default function AdminCrmPage() {
                       <TableHead>Üye</TableHead>
                       <TableHead>Link</TableHead>
                       <TableHead>Oluşturulma</TableHead>
+                      <TableHead className="text-right">Kota</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {workspaceList.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-xs text-zinc-500">
+                        <TableCell colSpan={6} className="h-24 text-center text-xs text-zinc-500">
                           Henüz kayıtlı müşteri çalışma alanı yok.
                         </TableCell>
                       </TableRow>
@@ -860,10 +978,42 @@ export default function AdminCrmPage() {
                             <span className="ml-2 font-mono text-[10px] text-zinc-400">{ws.slug}</span>
                           </TableCell>
                           <TableCell className="text-xs text-zinc-600">@{ws.ownerUsername}</TableCell>
-                          <TableCell className="text-xs font-mono">{ws.memberCount}</TableCell>
-                          <TableCell className="text-xs font-mono">{ws.linkCount}</TableCell>
+                          <TableCell className="text-xs font-mono">{ws.memberCount}{ws.maxMembers ? ` / ${ws.maxMembers}` : ''}</TableCell>
+                          <TableCell className="text-xs font-mono">{ws.linkCount}{ws.maxLinks ? ` / ${ws.maxLinks}` : ''}</TableCell>
                           <TableCell className="text-xs text-zinc-500">
                             {ws.createdAt ? new Date(ws.createdAt).toLocaleDateString('tr-TR') : '-'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {quotaEdit?.id === ws.id ? (
+                              <span className="inline-flex items-center gap-1">
+                                <input
+                                  value={quotaEdit.maxMembers}
+                                  onChange={(e) => setQuotaEdit({ ...quotaEdit, maxMembers: e.target.value })}
+                                  placeholder="üye"
+                                  className="w-14 rounded border border-zinc-200 px-1.5 py-1 text-[11px]"
+                                />
+                                <input
+                                  value={quotaEdit.maxLinks}
+                                  onChange={(e) => setQuotaEdit({ ...quotaEdit, maxLinks: e.target.value })}
+                                  placeholder="link"
+                                  className="w-16 rounded border border-zinc-200 px-1.5 py-1 text-[11px]"
+                                />
+                                <button onClick={handleSaveQuota} className="rounded bg-zinc-950 px-2 py-1 text-[11px] text-white">Kaydet</button>
+                                <button onClick={() => setQuotaEdit(null)} className="px-1 text-[11px] text-zinc-500">İptal</button>
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => setQuotaEdit({
+                                  id: ws.id,
+                                  name: ws.name,
+                                  maxMembers: ws.maxMembers ? String(ws.maxMembers) : '',
+                                  maxLinks: ws.maxLinks ? String(ws.maxLinks) : '',
+                                })}
+                                className="text-[11px] text-zinc-600 underline hover:text-zinc-950"
+                              >
+                                Düzenle
+                              </button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))

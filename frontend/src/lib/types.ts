@@ -39,6 +39,8 @@ export interface ShortenResponse {
   healthResponseTimeMs?: number;
   workspaceId?: string;
   workspaceName?: string;
+  /** What the current user may do with this link; missing means unknown (show everything). */
+  permissions?: RolePermissionDto;
   abTestingEnabled?: boolean;
   variants?: UrlVariantResponse[];
 }
@@ -110,6 +112,7 @@ export interface UserDto {
   email: string;
   role: string;
   twoFactorEnabled?: boolean;
+  emailVerified?: boolean;
   createdAt: number;
 }
 
@@ -308,6 +311,9 @@ export interface WorkspaceResponse {
   linkCount: number;
   createdAt: number;
   members?: WorkspaceMemberResponse[];
+  /** Plan limits; missing or null means unlimited. */
+  maxMembers?: number | null;
+  maxLinks?: number | null;
 }
 
 export interface CreateWorkspaceRequest {
@@ -443,4 +449,18 @@ export interface AcceptInvitationResponse {
   workspaceId: string;
   workspaceName: string;
   role: WorkspaceRole;
+}
+
+export interface CreateCustomerRequest {
+  name: string;
+  description?: string;
+  managerEmail: string;
+  /** Empty = platform default, 0 = unlimited. */
+  maxMembers?: number | null;
+  maxLinks?: number | null;
+}
+
+export interface ProvisionCustomerResponse {
+  workspace: WorkspaceResponse;
+  manager: InviteMemberResponse;
 }

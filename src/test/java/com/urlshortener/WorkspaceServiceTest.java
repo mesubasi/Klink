@@ -38,6 +38,12 @@ public class WorkspaceServiceTest {
     @Mock
     private UrlMappingRepository urlMappingRepository;
 
+    @Mock
+    private com.urlshortener.service.QuotaService quotaService;
+
+    @Mock
+    private com.urlshortener.service.EmailVerificationPolicy verificationPolicy;
+
     @InjectMocks
     private WorkspaceService workspaceService;
 

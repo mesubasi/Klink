@@ -21,13 +21,16 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
     private final TotpService totpService;
+    private final AuthTokenService authTokenService;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        MessageService messageService,
                        AuthenticationManager authenticationManager,
                        JwtTokenProvider tokenProvider,
-                       TotpService totpService) {
+                       TotpService totpService,
+                       AuthTokenService authTokenService) {
+        this.authTokenService = authTokenService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.messageService = messageService;
@@ -121,9 +124,11 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role("ROLE_USER")
                 .twoFactorEnabled(false)
+                .emailVerified(false)
                 .build();
 
         userRepository.save(user);
+        authTokenService.sendEmailVerification(user);
 
         String token = tokenProvider.generateTokenFromUsername(user.getUsername());
 
@@ -212,8 +217,16 @@ public class AuthService {
                 .email(user.getEmail())
                 .role(user.getRole())
                 .twoFactorEnabled(user.isTwoFactorEnabled())
+                .emailVerified(user.isEmailVerified())
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    @Transactional
+    public boolean resendEmailVerification(String username) {
+        UserAccount user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException(messageService.getMessage("user.not_found", username)));
+        return authTokenService.sendEmailVerification(user);
     }
 
     public String getLogoutMessage() {

@@ -191,21 +191,61 @@ public class WorkspacePermissionService {
      * </ul>
      */
     public boolean hasLinkPermission(UrlMapping mapping, String permissionName) {
+        RolePermissionDto permissions = effectiveLinkPermissions(mapping);
+        return permissions != null && isGranted(permissions, permissionName);
+    }
+
+    /**
+     * Everything the current user may do with a link, for the UI to show or hide actions.
+     * Returns null when nobody is logged in; callers treat that as "unknown".
+     */
+    public RolePermissionDto getLinkPermissions(UrlMapping mapping) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
-            return false;
+            return null;
+        }
+        RolePermissionDto permissions = effectiveLinkPermissions(mapping);
+        return permissions != null ? permissions : new RolePermissionDto(false, false, false, false, false, false);
+    }
+
+    private RolePermissionDto effectiveLinkPermissions(UrlMapping mapping) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            return null;
         }
 
-        boolean isSystemAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (isSystemAdmin) {
-            return true;
+        if (auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+            return RolePermissionDto.defaultAdminPreset();
         }
 
         if (mapping.getWorkspace() == null) {
-            return mapping.getUser() != null && mapping.getUser().getUsername().equals(auth.getName());
+            boolean owner = mapping.getUser() != null && mapping.getUser().getUsername().equals(auth.getName());
+            return owner ? RolePermissionDto.defaultAdminPreset() : null;
         }
 
-        return hasPermission(mapping.getWorkspace().getId(), auth.getName(), permissionName);
+        UUID workspaceId = mapping.getWorkspace().getId();
+        Optional<WorkspaceMember> member = memberRepository.findByWorkspaceIdAndUserUsername(workspaceId, auth.getName());
+        if (member.isEmpty()) {
+            return null;
+        }
+        WorkspaceRole role = member.get().getRole();
+        if (role == WorkspaceRole.ADMIN) {
+            return RolePermissionDto.defaultAdminPreset();
+        }
+        WorkspacePermissionMatrixResponse matrix = getPermissionMatrix(workspaceId);
+        return role == WorkspaceRole.MEMBER ? matrix.getMember() : matrix.getViewer();
+    }
+
+    private static boolean isGranted(RolePermissionDto permissions, String permissionName) {
+        return switch (permissionName) {
+            case "canCreateLink" -> permissions.isCanCreateLink();
+            case "canDeleteLink" -> permissions.isCanDeleteLink();
+            case "canExportReports" -> permissions.isCanExportReports();
+            case "canCustomizeQr" -> permissions.isCanCustomizeQr();
+            case "canManageWebhooks" -> permissions.isCanManageWebhooks();
+            case "canViewAnalytics" -> permissions.isCanViewAnalytics();
+            default -> false;
+        };
     }
 
     private void applyDtoToPolicy(WorkspacePermissionPolicy policy, RolePermissionDto dto) {
