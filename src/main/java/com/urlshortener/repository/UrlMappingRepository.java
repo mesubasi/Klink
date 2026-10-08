@@ -1,6 +1,8 @@
 package com.urlshortener.repository;
 
 import com.urlshortener.model.UrlMapping;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -19,6 +21,12 @@ public interface UrlMappingRepository extends JpaRepository<UrlMapping, UUID> {
     boolean existsByShortCode(String shortCode);
 
     List<UrlMapping> findByUserUsername(String username);
+
+    @Query("SELECT u FROM UrlMapping u WHERE u.user.username = :username AND " +
+           "(LOWER(u.shortCode) LIKE :pattern ESCAPE '\\' OR LOWER(u.originalUrl) LIKE :pattern ESCAPE '\\')")
+    Page<UrlMapping> searchByUsername(@Param("username") String username,
+                                      @Param("pattern") String pattern,
+                                      Pageable pageable);
 
     List<UrlMapping> findByWorkspaceId(UUID workspaceId);
 
