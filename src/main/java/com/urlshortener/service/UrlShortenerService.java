@@ -190,6 +190,11 @@ public class UrlShortenerService {
             }
         }
 
+        if (workspace != null && webhookUrl != null
+                && !workspacePermissionService.hasPermission(workspace.getId(), currentUser.getUsername(), "canManageWebhooks")) {
+            throw new SecurityException("Bu çalışma alanında webhook yönetme (canManageWebhooks) yetkiniz bulunmamaktadır.");
+        }
+
         UrlMapping mapping = UrlMapping.builder()
                 .originalUrl(originalUrl)
                 .shortCode(shortCode)
@@ -401,7 +406,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canViewAnalytics");
 
         List<ClickAnalytics> recentClicks = clickAnalyticsRepository.findTop50ByShortCodeOrderByClickedAtDesc(shortCode);
 
@@ -422,7 +427,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canViewAnalytics");
 
         List<ClickAnalytics> allClicks = clickAnalyticsRepository.findByShortCode(shortCode);
 
@@ -528,7 +533,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canExportReports");
 
         List<ClickAnalytics> clicks = clickAnalyticsRepository.findTop50ByShortCodeOrderByClickedAtDesc(shortCode);
 
@@ -542,7 +547,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canExportReports");
 
         String targetEmail = (customEmail != null && !customEmail.trim().isEmpty())
                 ? customEmail.trim()
@@ -638,7 +643,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canViewAnalytics");
         UrlMapping updated = linkHealthMonitorService.checkUrlHealth(mapping);
         return buildShortenResponse(updated);
     }
@@ -660,7 +665,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canCreateLink");
 
         mapping.setActive(active);
         urlMappingRepository.save(mapping);
@@ -685,7 +690,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
         
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canDeleteLink");
 
         urlMappingRepository.delete(mapping);
         evictFromCache(shortCode);
@@ -740,30 +745,10 @@ public class UrlShortenerService {
         return null;
     }
 
-    private void checkOwnershipOrAdmin(UrlMapping mapping) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
-            throw new IllegalArgumentException(messageService.getMessage("user.no_permission"));
+    private void checkLinkPermission(UrlMapping mapping, String permission) {
+        if (!workspacePermissionService.hasLinkPermission(mapping, permission)) {
+            throw new SecurityException(messageService.getMessage("user.no_permission"));
         }
-
-        boolean isSystemAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (isSystemAdmin) {
-            return;
-        }
-
-        if (mapping.getUser() != null && mapping.getUser().getUsername().equals(auth.getName())) {
-            return;
-        }
-
-        if (mapping.getWorkspace() != null) {
-            Optional<WorkspaceMember> memberOpt = workspaceMemberRepository.findByWorkspaceIdAndUserUsername(
-                    mapping.getWorkspace().getId(), auth.getName());
-            if (memberOpt.isPresent() && memberOpt.get().getRole() == WorkspaceRole.ADMIN) {
-                return;
-            }
-        }
-
-        throw new IllegalArgumentException(messageService.getMessage("user.no_permission"));
     }
 
     private void publishClickEvent(String shortCode, HttpServletRequest request) {
