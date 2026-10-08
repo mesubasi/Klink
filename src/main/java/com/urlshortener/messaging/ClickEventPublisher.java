@@ -4,6 +4,7 @@ import com.urlshortener.dto.ClickEventDto;
 import com.urlshortener.model.ClickAnalytics;
 import com.urlshortener.repository.ClickAnalyticsRepository;
 import com.urlshortener.repository.UrlMappingRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -18,6 +19,7 @@ public class ClickEventPublisher {
     private final RabbitTemplate rabbitTemplate;
     private final UrlMappingRepository urlMappingRepository;
     private final ClickAnalyticsRepository clickAnalyticsRepository;
+    private final MeterRegistry meterRegistry;
 
     @Value("${app.rabbitmq.exchange:url.click.exchange}")
     private String exchange;
@@ -25,7 +27,8 @@ public class ClickEventPublisher {
     @Value("${app.rabbitmq.routing-key:url.click.routingKey}")
     private String routingKey;
 
-    public ClickEventPublisher(RabbitTemplate rabbitTemplate, UrlMappingRepository urlMappingRepository, ClickAnalyticsRepository clickAnalyticsRepository) {
+    public ClickEventPublisher(RabbitTemplate rabbitTemplate, UrlMappingRepository urlMappingRepository, ClickAnalyticsRepository clickAnalyticsRepository, MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
         this.rabbitTemplate = rabbitTemplate;
         this.urlMappingRepository = urlMappingRepository;
         this.clickAnalyticsRepository = clickAnalyticsRepository;
@@ -35,6 +38,7 @@ public class ClickEventPublisher {
         try {
             log.info("RabbitMQ'ya tıklama olayı gönderiliyor: {}", event.getShortCode());
             rabbitTemplate.convertAndSend(exchange, routingKey, event);
+            countClickEvent("queued");
         } catch (Exception e) {
             log.warn("RabbitMQ bağlantı hatası! Tıklama olayı doğrudan DB'ye işleniyor. Hata: {}", e.getMessage());
             try {
@@ -52,9 +56,15 @@ public class ClickEventPublisher {
                         .botCategory(event.getBotCategory())
                         .build();
                 clickAnalyticsRepository.save(analytics);
+                countClickEvent("fallback_db");
             } catch (Exception ex) {
+                countClickEvent("failed");
                 log.error("Fallback DB işleminde hata oluştu: {}", ex.getMessage());
             }
         }
+    }
+
+    private void countClickEvent(String outcome) {
+        meterRegistry.counter("klink.click.events", "outcome", outcome).increment();
     }
 }

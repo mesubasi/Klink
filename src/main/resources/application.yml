@@ -19,6 +19,10 @@ spring:
       settings:
         web-allow-others: false
 
+  # Schema is managed by Hibernate in dev (H2); Flyway is enabled in the prod profile.
+  flyway:
+    enabled: false
+
   jpa:
     database-platform: ${JPA_DIALECT:org.hibernate.dialect.H2Dialect}
     hibernate:
@@ -54,6 +58,15 @@ spring:
           auth: ${SPRING_MAIL_SMTP_AUTH:false}
           starttls:
             enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 app:
   domain: ${APP_DOMAIN:http://localhost:8080}

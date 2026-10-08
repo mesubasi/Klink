@@ -59,6 +59,7 @@ public class SecurityConfig {
                 // Public Yönlendirme, Önizleme ve Link-in-Bio Endpoint'leri
                 .requestMatchers(HttpMethod.GET, "/{shortCode:[a-zA-Z0-9_-]{3,20}}", "/{shortCode:[a-zA-Z0-9_-]{3,20}}+", "/preview/**", "/bio/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/urls/*/preview", "/api/v1/urls/*/qrcode").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/invitations/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/bio/{username:[a-zA-Z0-9_-]+}").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/bio/{username:[a-zA-Z0-9_-]+}/view", "/api/v1/bio/link/*/click").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/urls/shorten", "/api/v1/urls/bulk-shorten", "/api/v1/urls/*/proceed", "/api/v1/urls/*/verify-password", "/api/v1/urls/qrcode/**").permitAll()
@@ -69,13 +70,16 @@ public class SecurityConfig {
                 // Actuator Healthcheck, H2 Konsolu ve Statik Kaynaklar
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/h2-console/**", "/error", "/css/**", "/js/**", "/index.html", "/").permitAll()
                 
+                // Prometheus metrikleri yalnızca ROLE_ADMIN (JWT) ile okunabilir
+                .requestMatchers("/actuator/prometheus").hasRole("ADMIN")
+
                 // Admin Özel Telemetri ve CRM Endpoint'leri (Yalnızca ROLE_ADMIN erişebilir)
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 
                 // Kullanıcı Yönetim Endpoint'leri (Bio Me, API Keys ve Çalışma Alanları Dahil)
                 .requestMatchers("/api/v1/bio/me", "/api/v1/api-keys/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/v1/urls/**").hasAnyRole("USER", "ADMIN")
-                .requestMatchers("/api/v1/workspaces/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/v1/workspaces/**", "/api/v1/invitations/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/v1/auth/me", "/api/v1/auth/2fa/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/v1/telemetry/**").hasAnyRole("USER", "ADMIN")
                 

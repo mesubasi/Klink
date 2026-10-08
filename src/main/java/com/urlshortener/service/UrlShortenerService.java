@@ -23,6 +23,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -187,6 +190,11 @@ public class UrlShortenerService {
             }
         }
 
+        if (workspace != null && webhookUrl != null
+                && !workspacePermissionService.hasPermission(workspace.getId(), currentUser.getUsername(), "canManageWebhooks")) {
+            throw new SecurityException("Bu çalışma alanında webhook yönetme (canManageWebhooks) yetkiniz bulunmamaktadır.");
+        }
+
         UrlMapping mapping = UrlMapping.builder()
                 .originalUrl(originalUrl)
                 .shortCode(shortCode)
@@ -243,9 +251,7 @@ public class UrlShortenerService {
             }
         }
 
-        if (!mapping.isPasswordProtected() && !hasRestrictions && !hasDeviceTargeting && !abTestActive && mapping.getMaxClicks() == null) {
-            cacheUrl(shortCode, originalUrl);
-        }
+        cacheMapping(mapping);
 
         return buildShortenResponse(mapping);
     }
@@ -306,7 +312,22 @@ public class UrlShortenerService {
         }
 
         publishClickEvent(shortCode, request, mapping);
+        cacheMapping(mapping);
         return resolveTargetByDevice(mapping, request);
+    }
+
+    /**
+     * Fast redirect path: returns the target URL straight from Redis for "simple" links
+     * (see {@link #isCacheable(UrlMapping)}) and records the click, without touching the database.
+     * Returns empty on a cache miss or when Redis is unavailable, so callers fall back to the database path.
+     */
+    public Optional<String> resolveFromCache(String shortCode, HttpServletRequest request) {
+        String cachedUrl = getFromCache(shortCode);
+        if (cachedUrl == null || cachedUrl.isBlank()) {
+            return Optional.empty();
+        }
+        publishClickEventForUrl(shortCode, request, cachedUrl);
+        return Optional.of(cachedUrl);
     }
 
     public String verifyPasswordAndGetUrl(String shortCode, String password, HttpServletRequest request) {
@@ -385,7 +406,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canViewAnalytics");
 
         List<ClickAnalytics> recentClicks = clickAnalyticsRepository.findTop50ByShortCodeOrderByClickedAtDesc(shortCode);
 
@@ -406,7 +427,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canViewAnalytics");
 
         List<ClickAnalytics> allClicks = clickAnalyticsRepository.findByShortCode(shortCode);
 
@@ -512,7 +533,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canExportReports");
 
         List<ClickAnalytics> clicks = clickAnalyticsRepository.findTop50ByShortCodeOrderByClickedAtDesc(shortCode);
 
@@ -526,7 +547,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canExportReports");
 
         String targetEmail = (customEmail != null && !customEmail.trim().isEmpty())
                 ? customEmail.trim()
@@ -575,11 +596,54 @@ public class UrlShortenerService {
                 .collect(Collectors.toList());
     }
 
+    private static final int MAX_PAGE_SIZE = 100;
+    private static final java.util.Set<String> SORTABLE_FIELDS = java.util.Set.of("createdAt", "clickCount", "shortCode");
+
+    public PagedResponse<ShortenResponse> searchMyUrls(String query, String filter, int page, int size, String sortBy, boolean descending) {
+        UserAccount user = getCurrentAuthenticatedUser();
+        if (user == null) {
+            throw new IllegalArgumentException(messageService.getMessage("user.not_found", "me"));
+        }
+
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        String sortField = SORTABLE_FIELDS.contains(sortBy) ? sortBy : "createdAt";
+        Sort sort = descending ? Sort.by(sortField).descending() : Sort.by(sortField).ascending();
+
+        String trimmed = query == null ? "" : query.trim().toLowerCase();
+        String escaped = trimmed.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        String pattern = "%" + escaped + "%";
+
+        Page<UrlMapping> result = urlMappingRepository.searchByUsername(
+                user.getUsername(), pattern, normalizeLinkFilter(filter), PageRequest.of(safePage, safeSize, sort));
+
+        List<ShortenResponse> content = result.getContent().stream()
+                .map(this::buildShortenResponse)
+                .collect(Collectors.toList());
+        return new PagedResponse<>(content, result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages());
+    }
+
+    private static final java.util.Set<String> LINK_FILTERS = java.util.Set.of("ALL", "PROTECTED", "PREVIEW", "BROKEN");
+
+    private String normalizeLinkFilter(String filter) {
+        String normalized = filter == null ? "ALL" : filter.trim().toUpperCase();
+        return LINK_FILTERS.contains(normalized) ? normalized : "ALL";
+    }
+
+    public LinkStatsResponse getMyUrlStats() {
+        UserAccount user = getCurrentAuthenticatedUser();
+        if (user == null) {
+            throw new IllegalArgumentException(messageService.getMessage("user.not_found", "me"));
+        }
+        return urlMappingRepository.getStatsByUsername(user.getUsername());
+    }
+
     public ShortenResponse checkHealth(String shortCode) {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canViewAnalytics");
         UrlMapping updated = linkHealthMonitorService.checkUrlHealth(mapping);
         return buildShortenResponse(updated);
     }
@@ -601,7 +665,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canCreateLink");
 
         mapping.setActive(active);
         urlMappingRepository.save(mapping);
@@ -609,8 +673,8 @@ public class UrlShortenerService {
         if (!active) {
             evictFromCache(shortCode);
             log.info("Link pasife alındı ve Redis cache silindi: {}", shortCode);
-        } else if (!mapping.isPasswordProtected()) {
-            cacheUrl(shortCode, mapping.getOriginalUrl());
+        } else {
+            cacheMapping(mapping);
             log.info("Link aktife alındı ve Redis cache güncellendi: {}", shortCode);
         }
 
@@ -626,7 +690,7 @@ public class UrlShortenerService {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
         
-        checkOwnershipOrAdmin(mapping);
+        checkLinkPermission(mapping, "canDeleteLink");
 
         urlMappingRepository.delete(mapping);
         evictFromCache(shortCode);
@@ -681,30 +745,10 @@ public class UrlShortenerService {
         return null;
     }
 
-    private void checkOwnershipOrAdmin(UrlMapping mapping) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
-            throw new IllegalArgumentException(messageService.getMessage("user.no_permission"));
+    private void checkLinkPermission(UrlMapping mapping, String permission) {
+        if (!workspacePermissionService.hasLinkPermission(mapping, permission)) {
+            throw new SecurityException(messageService.getMessage("user.no_permission"));
         }
-
-        boolean isSystemAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (isSystemAdmin) {
-            return;
-        }
-
-        if (mapping.getUser() != null && mapping.getUser().getUsername().equals(auth.getName())) {
-            return;
-        }
-
-        if (mapping.getWorkspace() != null) {
-            Optional<WorkspaceMember> memberOpt = workspaceMemberRepository.findByWorkspaceIdAndUserUsername(
-                    mapping.getWorkspace().getId(), auth.getName());
-            if (memberOpt.isPresent() && memberOpt.get().getRole() == WorkspaceRole.ADMIN) {
-                return;
-            }
-        }
-
-        throw new IllegalArgumentException(messageService.getMessage("user.no_permission"));
     }
 
     private void publishClickEvent(String shortCode, HttpServletRequest request) {
@@ -712,6 +756,10 @@ public class UrlShortenerService {
     }
 
     private void publishClickEvent(String shortCode, HttpServletRequest request, UrlMapping mapping) {
+        publishClickEventForUrl(shortCode, request, mapping != null ? mapping.getOriginalUrl() : null);
+    }
+
+    private void publishClickEventForUrl(String shortCode, HttpServletRequest request, String originalUrl) {
         String clientIp = getClientIp(request);
         String userAgent = request != null ? request.getHeader("User-Agent") : null;
         GeoIpService.GeoLocation location = geoIpService.resolveLocation(clientIp);
@@ -726,8 +774,8 @@ public class UrlShortenerService {
         String utmTerm = request != null ? request.getParameter("utm_term") : null;
         String utmContent = request != null ? request.getParameter("utm_content") : null;
 
-        if (mapping != null && mapping.getOriginalUrl() != null) {
-            Map<String, String> queryParams = parseQueryParams(mapping.getOriginalUrl());
+        if (originalUrl != null) {
+            Map<String, String> queryParams = parseQueryParams(originalUrl);
             if (utmSource == null || utmSource.trim().isEmpty()) utmSource = queryParams.get("utm_source");
             if (utmMedium == null || utmMedium.trim().isEmpty()) utmMedium = queryParams.get("utm_medium");
             if (utmCampaign == null || utmCampaign.trim().isEmpty()) utmCampaign = queryParams.get("utm_campaign");
@@ -798,9 +846,53 @@ public class UrlShortenerService {
         return referrer;
     }
 
-    private void cacheUrl(String shortCode, String originalUrl) {
+    /**
+     * A cache entry means: the link is active, not expired and redirects every visitor to the same
+     * target without any per-request decision (no password, geo/IP rules, device targeting, A/B test,
+     * click cap or preview page). Anything else must go through the database path.
+     */
+    public boolean isCacheable(UrlMapping mapping) {
+        if (!mapping.isActive() || mapping.isPasswordProtected() || mapping.isPreviewEnabled() || mapping.isAbTestingEnabled()) {
+            return false;
+        }
+        if (mapping.getMaxClicks() != null) {
+            return false;
+        }
+        if (hasText(mapping.getBlockedCountries()) || hasText(mapping.getBlockedIps())) {
+            return false;
+        }
+        if (hasText(mapping.getIosUrl()) || hasText(mapping.getAndroidUrl()) || hasText(mapping.getDesktopUrl())) {
+            return false;
+        }
+        return mapping.getExpiresAt() == null || mapping.getExpiresAt() > System.currentTimeMillis();
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    /** Caches the mapping when it is cacheable; the entry expires with the link if it has an expiry date. */
+    private void cacheMapping(UrlMapping mapping) {
+        if (!isCacheable(mapping)) {
+            evictFromCache(mapping.getShortCode());
+            return;
+        }
+        Duration ttl = Duration.ofHours(24);
+        if (mapping.getExpiresAt() != null) {
+            Duration untilExpiry = Duration.ofMillis(mapping.getExpiresAt() - System.currentTimeMillis());
+            if (untilExpiry.compareTo(ttl) < 0) {
+                ttl = untilExpiry;
+            }
+        }
+        if (ttl.isZero() || ttl.isNegative()) {
+            return;
+        }
+        cacheUrl(mapping.getShortCode(), mapping.getOriginalUrl(), ttl);
+    }
+
+    private void cacheUrl(String shortCode, String originalUrl, Duration ttl) {
         try {
-            redisTemplate.opsForValue().set(REDIS_PREFIX + shortCode, originalUrl, Duration.ofHours(24));
+            redisTemplate.opsForValue().set(REDIS_PREFIX + shortCode, originalUrl, ttl);
         } catch (Exception e) {
             log.warn("Redis kaydı sırasında hata oluştu: {}", e.getMessage());
         }

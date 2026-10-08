@@ -7,8 +7,6 @@ import com.urlshortener.dto.UrlVariantResponse;
 import com.urlshortener.model.UrlMapping;
 import com.urlshortener.model.UrlVariant;
 import com.urlshortener.model.UserAccount;
-import com.urlshortener.model.WorkspaceMember;
-import com.urlshortener.model.WorkspaceRole;
 import com.urlshortener.repository.UrlMappingRepository;
 import com.urlshortener.repository.UrlVariantRepository;
 import com.urlshortener.repository.UserRepository;
@@ -19,8 +17,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,13 +33,16 @@ public class AbTestService {
     private final UrlVariantRepository urlVariantRepository;
     private final UserRepository userRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final WorkspacePermissionService workspacePermissionService;
     private final RedisTemplate<String, Object> redisTemplate;
 
     public AbTestService(UrlMappingRepository urlMappingRepository,
                          UrlVariantRepository urlVariantRepository,
                          UserRepository userRepository,
                          WorkspaceMemberRepository workspaceMemberRepository,
+                         WorkspacePermissionService workspacePermissionService,
                          RedisTemplate<String, Object> redisTemplate) {
+        this.workspacePermissionService = workspacePermissionService;
         this.urlMappingRepository = urlMappingRepository;
         this.urlVariantRepository = urlVariantRepository;
         this.userRepository = userRepository;
@@ -204,28 +203,8 @@ public class AbTestService {
     }
 
     private void checkOwnershipOrAdmin(UrlMapping mapping) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            throw new SecurityException("Bu işlem için oturum açmanız gerekmektedir.");
+        if (!workspacePermissionService.hasLinkPermission(mapping, "canCreateLink")) {
+            throw new SecurityException("Bu linkin A/B test ayarlarını değiştirme yetkiniz bulunmamaktadır.");
         }
-
-        boolean isSystemAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (isSystemAdmin) {
-            return;
-        }
-
-        if (mapping.getUser() != null && mapping.getUser().getUsername().equals(auth.getName())) {
-            return;
-        }
-
-        if (mapping.getWorkspace() != null) {
-            Optional<WorkspaceMember> memberOpt = workspaceMemberRepository.findByWorkspaceIdAndUserUsername(
-                    mapping.getWorkspace().getId(), auth.getName());
-            if (memberOpt.isPresent() && memberOpt.get().getRole() == WorkspaceRole.ADMIN) {
-                return;
-            }
-        }
-
-        throw new SecurityException("Bu linkin A/B test ayarlarını değiştirme yetkiniz bulunmamaktadır.");
     }
 }

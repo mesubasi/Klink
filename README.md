@@ -20,7 +20,7 @@ Built with **Spring Boot 3 (Java 17/21)**, **Redis In-Memory Cache**, **RabbitMQ
 ## 🌟 Key Capabilities & Feature Matrix
 
 ### 🚀 1. Intelligent URL Shortening & Routing
-- **Sub-2ms Redirections**: High-speed in-memory Redis caching avoids database trips on hot paths for instantaneous HTTP 302 redirects.
+- **Fast Redirections**: Simple links (no password, geo/IP rules, device targeting, A/B test, click cap or preview page) are served straight from Redis without a database trip; cache entries expire with the link and are evicted on deactivate/delete. Links that need a per-request decision always take the database path.
 - **Base62 & Custom Aliases**: Generate clean 7-character short codes or customize your own branded vanity links.
 - **📱 Device-Based Deep Linking**: Route users to specialized URLs based on their client device (**iOS**, **Android**, **Desktop**).
 - **🌍 Geo-Blocking & Fallback Routing**: Restrict access by ISO country codes or IP CIDR subnets with custom fallback destinations.
@@ -144,6 +144,8 @@ mvnw.cmd spring-boot:run
 # Linux / macOS
 ./mvnw spring-boot:run
 ```
+*Note: In `prod` profile the schema is managed by Flyway migrations (`src/main/resources/db/migration`) and Hibernate only validates it. Existing databases are baselined at V1 automatically.*
+
 *Note: In `dev` profile, backend automatically initializes in-memory H2 database (`http://localhost:8080/h2-console`) with seeded test accounts (`admin` / `admin123` and `user` / `password`).*
 
 ### 4. Start Frontend (Next.js)
@@ -187,6 +189,9 @@ Create a `.env` file based on `.env.example`:
 | `POST` | `/api/v1/urls/shorten` | Shorten a single URL with deep-link & security options | Public / User |
 | `POST` | `/api/v1/urls/bulk-shorten` | Batch shorten multiple URLs (up to 50) | User / Admin |
 | `GET` | `/api/v1/urls/my-urls` | Retrieve all shortened URLs for authenticated user | User / Admin |
+| `GET` | `/api/v1/urls/my-urls/search` | Search (`q`), filter (`ALL`, `PROTECTED`, `PREVIEW`, `BROKEN`) and paginate (`page`, `size` ≤ 100, `sortBy`, `direction`) your links | User / Admin |
+| `GET` | `/api/v1/urls/my-urls/stats` | Aggregate counters for your links (total, clicks, protected, broken, healthy) | User / Admin |
+| `GET` | `/actuator/prometheus` | Prometheus metrics (redirect latency, click events, RabbitMQ queue depth) | Admin |
 | `GET` | `/api/v1/urls/{shortCode}/analytics` | Comprehensive click telemetry & geo stats | Owner / Admin |
 | `GET` | `/api/v1/urls/{shortCode}/qrcode` | Generate dynamic customized PNG or SVG QR code | Public |
 | `POST` | `/api/v1/urls/qrcode/custom` | Generate standalone custom QR code from any payload | Public |
@@ -195,6 +200,38 @@ Create a `.env` file based on `.env.example`:
 | `POST` | `/api/v1/bio/me` | Create or update authenticated user's bio page | User / Admin |
 | `POST` | `/api/v1/api-keys/apply` | Apply for a developer API key | User / Admin |
 | `POST` | `/api/v1/auth/2fa/setup` | Initialize TOTP 2FA secret and QR code | User / Admin |
+
+### 🔐 Workspace Roles & Permissions
+
+Each workspace has three roles. The workspace `ADMIN` (the creator, e.g. a manager) can add members, change their roles and edit the permission matrix for `MEMBER` and `VIEWER` from the dashboard. System admins (`ROLE_ADMIN`) can do everything.
+
+| Permission | Enforced on |
+| :--- | :--- |
+| `canCreateLink` | Creating workspace links, toggling link status, A/B test configuration |
+| `canDeleteLink` | Deleting a link |
+| `canViewAnalytics` | Link analytics and summary, on-demand health check |
+| `canExportReports` | CSV/PDF export and emailed reports |
+| `canManageWebhooks` | Setting a webhook when creating a workspace link |
+
+Permissions follow the role, not link ownership: a member who created a link is still bound by the matrix, and someone removed from the workspace loses access to its links. Personal links (no workspace) are limited to their owner. `canCustomizeQr` is stored but not enforced, because QR images are public. Denied requests return `403`.
+
+### 🏢 Customers, Invitations & Platform Admins
+
+Klink is multi-tenant: every customer company is a workspace. The person who creates it becomes its `ADMIN` and can bring in their own staff:
+
+- **Invite by email** (`POST /api/v1/workspaces/{id}/invitations`): an already registered email is added immediately; otherwise a single-use invitation link (valid for `INVITATION_EXPIRY_DAYS`, default 7) is emailed. The link only works for the invited address, only the SHA-256 hash of its token is stored, and re-inviting or revoking invalidates older links. If SMTP is not configured the link is shown to the inviter instead. Invitees open `/invite/{token}`, register or log in, and accept.
+- **Platform admins (`ROLE_ADMIN`)** see every workspace under `GET /api/v1/admin/workspaces` (the **Müşteriler** tab of the admin panel) and can read and manage any workspace — members, invitations, permission matrix, links — without being a member.
+- Set `FRONTEND_INVITE_URL` (default `https://klink.to/invite/%s`) so emailed links point at your frontend.
+
+### 📈 Metrics
+
+Prometheus metrics are exposed at `/actuator/prometheus` and require an admin JWT (`Authorization: Bearer <token>`):
+
+| Metric | Description |
+| :--- | :--- |
+| `klink_redirect_seconds` | Redirect latency histogram, tagged by `outcome` (`cache_hit`, `redirect`, `preview`, `not_found`, `error`) |
+| `klink_click_events_total` | Click events by `outcome` (`queued`, `fallback_db`, `failed`) |
+| `klink_rabbitmq_queue_messages` / `klink_rabbitmq_queue_consumers` | Click queue depth and consumers (`NaN` when the broker is unreachable) |
 
 Full interactive API explorer is available at: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
 

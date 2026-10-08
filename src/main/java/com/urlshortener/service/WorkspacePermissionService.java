@@ -180,6 +180,34 @@ public class WorkspacePermissionService {
         };
     }
 
+    /**
+     * Decides whether the current user may perform {@code permissionName} on the given link.
+     * <ul>
+     *   <li>System admins can do everything.</li>
+     *   <li>Personal links (no workspace) are limited to their owner.</li>
+     *   <li>Workspace links follow the workspace role: workspace admins can do everything, members and
+     *       viewers get exactly what the workspace's permission matrix grants their role. Link ownership
+     *       does not bypass the matrix, and users who left the workspace lose access to its links.</li>
+     * </ul>
+     */
+    public boolean hasLinkPermission(UrlMapping mapping, String permissionName) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            return false;
+        }
+
+        boolean isSystemAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isSystemAdmin) {
+            return true;
+        }
+
+        if (mapping.getWorkspace() == null) {
+            return mapping.getUser() != null && mapping.getUser().getUsername().equals(auth.getName());
+        }
+
+        return hasPermission(mapping.getWorkspace().getId(), auth.getName(), permissionName);
+    }
+
     private void applyDtoToPolicy(WorkspacePermissionPolicy policy, RolePermissionDto dto) {
         policy.setCanCreateLink(dto.isCanCreateLink());
         policy.setCanDeleteLink(dto.isCanDeleteLink());
@@ -201,17 +229,34 @@ public class WorkspacePermissionService {
         );
     }
 
-    private void requireAdminRole(UUID workspaceId, UserAccount user) {
+    private boolean isSystemAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isSystemSuperAdmin = auth != null && auth.getAuthorities().stream()
+        return auth != null && auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    }
+
+    private void requireAdminRole(UUID workspaceId, UserAccount user) {
+        if (isSystemAdmin()) {
+            return;
+        }
 
         WorkspaceMember member = memberRepository.findByWorkspaceIdAndUserId(workspaceId, user.getId())
                 .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
 
-        if (!isSystemSuperAdmin && member.getRole() != WorkspaceRole.ADMIN) {
+        if (member.getRole() != WorkspaceRole.ADMIN) {
             throw new SecurityException("İzin matrisini yönetmek için Çalışma Alanı Yöneticisi (WORKSPACE_ADMIN) yetkisi gereklidir.");
         }
+    }
+
+    /** Matrix lookup for API callers: only workspace members and system admins may read a workspace's permissions. */
+    @Transactional(readOnly = true)
+    public WorkspacePermissionMatrixResponse getPermissionMatrixForCurrentUser(UUID workspaceId) {
+        if (!isSystemAdmin()) {
+            UserAccount currentUser = getCurrentAuthenticatedUser();
+            memberRepository.findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
+                    .orElseThrow(() -> new SecurityException("Bu çalışma alanının üyesi değilsiniz."));
+        }
+        return getPermissionMatrix(workspaceId);
     }
 
     private UserAccount getCurrentAuthenticatedUser() {
