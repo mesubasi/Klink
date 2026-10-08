@@ -5,6 +5,7 @@ import com.urlshortener.exception.UrlAccessRestrictedException;
 import com.urlshortener.exception.UrlNotFoundException;
 import com.urlshortener.messaging.ClickEventPublisher;
 import com.urlshortener.model.ClickAnalytics;
+import com.urlshortener.model.AuditAction;
 import com.urlshortener.model.UrlMapping;
 import com.urlshortener.model.UrlVariant;
 import com.urlshortener.model.UserAccount;
@@ -66,6 +67,7 @@ public class UrlShortenerService {
     private final UrlVariantRepository urlVariantRepository;
     private final AbTestService abTestService;
     private final QuotaService quotaService;
+    private final AuditService auditService;
 
     @Value("${app.domain:http://localhost:8080}")
     private String domain;
@@ -90,7 +92,9 @@ public class UrlShortenerService {
                                WorkspacePermissionService workspacePermissionService,
                                UrlVariantRepository urlVariantRepository,
                                AbTestService abTestService,
-                               QuotaService quotaService) {
+                               QuotaService quotaService,
+                               AuditService auditService) {
+        this.auditService = auditService;
         this.quotaService = quotaService;
         this.urlMappingRepository = urlMappingRepository;
         this.clickAnalyticsRepository = clickAnalyticsRepository;
@@ -409,11 +413,13 @@ public class UrlShortenerService {
         return resolveTargetByDevice(mapping, request);
     }
 
+    @Transactional(readOnly = true)
     public UrlStatsResponse getAnalytics(String shortCode) {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
         checkLinkPermission(mapping, "canViewAnalytics");
+        auditPlatformAdminAccess(mapping, "analytics");
 
         List<ClickAnalytics> recentClicks = clickAnalyticsRepository.findTop50ByShortCodeOrderByClickedAtDesc(shortCode);
 
@@ -430,11 +436,13 @@ public class UrlShortenerService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public AnalyticsSummaryResponse getAnalyticsSummary(String shortCode) {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
         checkLinkPermission(mapping, "canViewAnalytics");
+        auditPlatformAdminAccess(mapping, "analytics summary");
 
         List<ClickAnalytics> allClicks = clickAnalyticsRepository.findByShortCode(shortCode);
 
@@ -536,11 +544,13 @@ public class UrlShortenerService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public byte[] exportAnalyticsReport(String shortCode, String format) {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
         checkLinkPermission(mapping, "canExportReports");
+        auditLinkChange(AuditAction.LINK_REPORT_EXPORTED, mapping, "format=" + format);
 
         List<ClickAnalytics> clicks = clickAnalyticsRepository.findTop50ByShortCodeOrderByClickedAtDesc(shortCode);
 
@@ -550,11 +560,13 @@ public class UrlShortenerService {
         return reportExportService.generateCsvReport(mapping, clicks);
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> sendWeeklyEmailReport(String shortCode, String customEmail) {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
 
         checkLinkPermission(mapping, "canExportReports");
+        auditLinkChange(AuditAction.LINK_REPORT_EXPORTED, mapping, "emailed report");
 
         String targetEmail = (customEmail != null && !customEmail.trim().isEmpty())
                 ? customEmail.trim()
@@ -681,6 +693,7 @@ public class UrlShortenerService {
 
         mapping.setActive(active);
         urlMappingRepository.save(mapping);
+        auditLinkChange(AuditAction.LINK_STATUS_CHANGED, mapping, "active=" + active);
 
         if (!active) {
             evictFromCache(shortCode);
@@ -704,6 +717,7 @@ public class UrlShortenerService {
         
         checkLinkPermission(mapping, "canDeleteLink");
 
+        auditLinkChange(AuditAction.LINK_DELETED, mapping, null);
         urlMappingRepository.delete(mapping);
         evictFromCache(shortCode);
     }
@@ -759,7 +773,43 @@ public class UrlShortenerService {
 
     private void checkLinkPermission(UrlMapping mapping, String permission) {
         if (!workspacePermissionService.hasLinkPermission(mapping, permission)) {
+            auditService.denied(permission, "LINK", mapping.getShortCode(), workspaceIdOf(mapping));
             throw new SecurityException(messageService.getMessage("user.no_permission"));
+        }
+    }
+
+    private static java.util.UUID workspaceIdOf(UrlMapping mapping) {
+        return mapping.getWorkspace() != null ? mapping.getWorkspace().getId() : null;
+    }
+
+    /** Workspace links, and anything a platform admin touches that is not theirs, leave a trail. */
+    private boolean isAuditedLink(UrlMapping mapping) {
+        return mapping.getWorkspace() != null || isOutsidePlatformAdmin(mapping);
+    }
+
+    private boolean isOutsidePlatformAdmin(UrlMapping mapping) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+            return false;
+        }
+        boolean owner = mapping.getUser() != null && mapping.getUser().getUsername().equals(auth.getName());
+        boolean member = mapping.getWorkspace() != null
+                && workspaceMemberRepository.existsByWorkspaceIdAndUserUsername(mapping.getWorkspace().getId(), auth.getName());
+        return !owner && !member;
+    }
+
+    /** Read access by a platform admin to a customer's link statistics. */
+    private void auditPlatformAdminAccess(UrlMapping mapping, String what) {
+        if (isOutsidePlatformAdmin(mapping)) {
+            auditService.record(AuditAction.ADMIN_ACCESSED_LINK, "LINK", mapping.getShortCode(), workspaceIdOf(mapping), what);
+        }
+    }
+
+    private void auditLinkChange(AuditAction action, UrlMapping mapping, String details) {
+        if (isAuditedLink(mapping)) {
+            auditService.record(action, "LINK", mapping.getShortCode(), workspaceIdOf(mapping),
+                    (details != null ? details + "; " : "") + "target=" + mapping.getOriginalUrl()
+                            + (isOutsidePlatformAdmin(mapping) ? " [platform admin, not owner/member]" : ""));
         }
     }
 

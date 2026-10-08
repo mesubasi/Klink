@@ -464,3 +464,29 @@ export interface ProvisionCustomerResponse {
   workspace: WorkspaceResponse;
   manager: InviteMemberResponse;
 }
+
+export interface AuditEventResponse {
+  id: string;
+  occurredAt: number;
+  actorUsername?: string | null;
+  actorRole?: string | null;
+  action: string;
+  outcome: 'SUCCESS' | 'FAILURE' | 'DENIED' | string;
+  targetType?: string | null;
+  targetId?: string | null;
+  workspaceId?: string | null;
+  ip?: string | null;
+  forwardedFor?: string | null;
+  userAgent?: string | null;
+  details?: string | null;
+}
+
+export interface AuditQuery {
+  actor?: string;
+  action?: string;
+  outcome?: string;
+  from?: number;
+  to?: number;
+  page?: number;
+  size?: number;
+}

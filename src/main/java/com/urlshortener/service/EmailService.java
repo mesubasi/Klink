@@ -45,17 +45,38 @@ public class EmailService {
         this.mailSenderProvider = mailSenderProvider;
     }
 
+    /**
+     * Plain values for the alert. The mail is sent on another thread, which must never touch JPA entities
+     * (their lazy associations belong to the request's Hibernate session), so everything is copied up front.
+     */
+    public record BrokenLinkAlert(String recipientEmail, String shortCode, String originalUrl, String errorMessage, long checkedAt) {
+
+        /** Call this on the thread that owns the entity. Returns null when the owner has no email address. */
+        public static BrokenLinkAlert from(UrlMapping mapping) {
+            if (mapping == null || mapping.getUser() == null || mapping.getUser().getEmail() == null
+                    || mapping.getUser().getEmail().trim().isEmpty()) {
+                return null;
+            }
+            return new BrokenLinkAlert(
+                    mapping.getUser().getEmail().trim(),
+                    mapping.getShortCode(),
+                    mapping.getOriginalUrl(),
+                    mapping.getHealthErrorMessage() != null ? mapping.getHealthErrorMessage() : "Hedef sunucuya ulaşılamadı",
+                    mapping.getLastHealthCheck() != null ? mapping.getLastHealthCheck() : System.currentTimeMillis());
+        }
+    }
+
     @Async
-    public void sendBrokenLinkAlert(UrlMapping mapping) {
-        if (mapping == null || mapping.getUser() == null || mapping.getUser().getEmail() == null || mapping.getUser().getEmail().trim().isEmpty()) {
+    public void sendBrokenLinkAlert(BrokenLinkAlert alert) {
+        if (alert == null) {
             return;
         }
 
-        String recipientEmail = mapping.getUser().getEmail().trim();
-        String shortCode = mapping.getShortCode();
-        String originalUrl = mapping.getOriginalUrl();
-        String errorMessage = mapping.getHealthErrorMessage() != null ? mapping.getHealthErrorMessage() : "Hedef sunucuya ulaşılamadı";
-        String timeStr = Instant.ofEpochMilli(mapping.getLastHealthCheck() != null ? mapping.getLastHealthCheck() : System.currentTimeMillis())
+        String recipientEmail = alert.recipientEmail();
+        String shortCode = alert.shortCode();
+        String originalUrl = alert.originalUrl();
+        String errorMessage = alert.errorMessage();
+        String timeStr = Instant.ofEpochMilli(alert.checkedAt())
                 .atZone(ZoneId.systemDefault())
                 .format(FORMATTER);
 

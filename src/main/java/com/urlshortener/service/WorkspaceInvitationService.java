@@ -5,6 +5,7 @@ import com.urlshortener.dto.AddWorkspaceMemberRequest;
 import com.urlshortener.dto.InvitationPreviewResponse;
 import com.urlshortener.dto.InviteMemberResponse;
 import com.urlshortener.dto.WorkspaceInvitationResponse;
+import com.urlshortener.model.AuditAction;
 import com.urlshortener.model.InvitationStatus;
 import com.urlshortener.model.UserAccount;
 import com.urlshortener.model.Workspace;
@@ -47,6 +48,7 @@ public class WorkspaceInvitationService {
     private final EmailService emailService;
     private final EmailVerificationPolicy verificationPolicy;
     private final QuotaService quotaService;
+    private final AuditService auditService;
 
     @Value("${app.invitation.expiry-days:7}")
     private int expiryDays;
@@ -61,7 +63,9 @@ public class WorkspaceInvitationService {
                                       WorkspaceService workspaceService,
                                       EmailService emailService,
                                       EmailVerificationPolicy verificationPolicy,
-                                      QuotaService quotaService) {
+                                      QuotaService quotaService,
+                                      AuditService auditService) {
+        this.auditService = auditService;
         this.quotaService = quotaService;
         this.verificationPolicy = verificationPolicy;
         this.invitationRepository = invitationRepository;
@@ -111,6 +115,8 @@ public class WorkspaceInvitationService {
         boolean emailSent = emailService.sendWorkspaceInvitation(
                 email, workspace.getName(), inviter.getUsername(), role.name(), inviteUrl, invitation.getExpiresAt());
 
+        auditService.record(AuditAction.INVITATION_SENT, "INVITATION", invitation.getId().toString(), workspaceId,
+                "email=" + email + " role=" + role + " emailSent=" + emailSent);
         log.info("Çalışma alanı daveti oluşturuldu: workspace={} email={} role={} emailSent={}", workspace.getName(), email, role, emailSent);
         return InviteMemberResponse.invited(toResponse(invitation), emailSent, inviteUrl);
     }
@@ -132,6 +138,7 @@ public class WorkspaceInvitationService {
         if (invitation.getStatus() == InvitationStatus.PENDING) {
             invitation.setStatus(InvitationStatus.REVOKED);
             invitationRepository.save(invitation);
+            auditService.record(AuditAction.INVITATION_REVOKED, "INVITATION", invitationId.toString(), workspaceId, "email=" + invitation.getEmail());
         }
     }
 
@@ -159,6 +166,7 @@ public class WorkspaceInvitationService {
                 .orElseThrow(() -> new IllegalArgumentException(INVALID_INVITATION));
 
         if (user.getEmail() == null || !user.getEmail().trim().equalsIgnoreCase(invitation.getEmail())) {
+            auditService.denied("accept invitation for another email", "INVITATION", invitation.getId().toString(), invitation.getWorkspace().getId());
             throw new SecurityException("Bu davet başka bir e-posta adresi için oluşturulmuş. Davet edilen e-posta adresiyle giriş yapın.");
         }
 
@@ -177,6 +185,8 @@ public class WorkspaceInvitationService {
         invitation.setAcceptedAt(System.currentTimeMillis());
         invitationRepository.save(invitation);
 
+        auditService.record(AuditAction.INVITATION_ACCEPTED, "INVITATION", invitation.getId().toString(), workspace.getId(),
+                "user=" + user.getUsername() + " role=" + invitation.getRole());
         log.info("Çalışma alanı daveti kabul edildi: user={} workspace={} role={}", user.getUsername(), workspace.getName(), invitation.getRole());
         return new AcceptInvitationResponse(workspace.getId(), workspace.getName(), invitation.getRole());
     }

@@ -1,6 +1,7 @@
 package com.urlshortener.service;
 
 import com.urlshortener.dto.*;
+import com.urlshortener.model.AuditAction;
 import com.urlshortener.model.UserAccount;
 import com.urlshortener.repository.UserRepository;
 import com.urlshortener.security.JwtTokenProvider;
@@ -22,6 +23,7 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final TotpService totpService;
     private final AuthTokenService authTokenService;
+    private final AuditService auditService;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
@@ -29,8 +31,10 @@ public class AuthService {
                        AuthenticationManager authenticationManager,
                        JwtTokenProvider tokenProvider,
                        TotpService totpService,
-                       AuthTokenService authTokenService) {
+                       AuthTokenService authTokenService,
+                       AuditService auditService) {
         this.authTokenService = authTokenService;
+        this.auditService = auditService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.messageService = messageService;
@@ -39,13 +43,18 @@ public class AuthService {
         this.totpService = totpService;
     }
 
+    /** Checks the credentials; a refusal is written to the audit trail (with the attempted username, never the password). */
+    private Authentication authenticateOrAudit(String username, String password) {
+        try {
+            return authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
+        } catch (org.springframework.security.core.AuthenticationException e) {
+            auditService.recordAs(null, null, AuditAction.LOGIN_FAILED, AuditService.FAILURE, "USER", username, null, "bad credentials");
+            throw e;
+        }
+    }
+
     public AuthResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getUsername().trim(),
-                        request.getPassword()
-                )
-        );
+        Authentication authentication = authenticateOrAudit(request.getUsername().trim(), request.getPassword());
 
         UserAccount user = userRepository.findByUsername(request.getUsername().trim())
                 .orElseThrow(() -> new IllegalArgumentException(messageService.getMessage("user.not_found", request.getUsername())));
@@ -62,6 +71,7 @@ public class AuthService {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String token = tokenProvider.generateToken(user);
+        auditService.recordAs(user.getUsername(), user.getRole(), AuditAction.LOGIN_SUCCESS, AuditService.SUCCESS, "USER", user.getUsername(), null, null);
 
         return AuthResponse.builder()
                 .username(user.getUsername())
@@ -75,12 +85,7 @@ public class AuthService {
     }
 
     public AuthResponse verify2FALogin(TotpLoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getUsername().trim(),
-                        request.getPassword()
-                )
-        );
+        Authentication authentication = authenticateOrAudit(request.getUsername().trim(), request.getPassword());
 
         UserAccount user = userRepository.findByUsername(request.getUsername().trim())
                 .orElseThrow(() -> new IllegalArgumentException(messageService.getMessage("user.not_found", request.getUsername())));
@@ -91,11 +96,13 @@ public class AuthService {
 
         boolean valid = totpService.verifyCode(user.getTwoFactorSecret(), request.getCode());
         if (!valid) {
+            auditService.recordAs(user.getUsername(), user.getRole(), AuditAction.LOGIN_FAILED, AuditService.FAILURE, "USER", user.getUsername(), null, "invalid 2FA code");
             throw new IllegalArgumentException("Girdiğiniz 2FA kodu geçersiz veya süresi dolmuş!");
         }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String token = tokenProvider.generateToken(user);
+        auditService.recordAs(user.getUsername(), user.getRole(), AuditAction.LOGIN_SUCCESS, AuditService.SUCCESS, "USER", user.getUsername(), null, null);
 
         return AuthResponse.builder()
                 .username(user.getUsername())
@@ -129,6 +136,7 @@ public class AuthService {
 
         userRepository.save(user);
         authTokenService.sendEmailVerification(user);
+        auditService.recordAs(user.getUsername(), user.getRole(), AuditAction.USER_REGISTERED, AuditService.SUCCESS, "USER", user.getUsername(), null, null);
 
         String token = tokenProvider.generateToken(user);
 
@@ -170,6 +178,7 @@ public class AuthService {
         user.setTwoFactorSecret(request.getSecretKey().trim());
         user.setTwoFactorEnabled(true);
         userRepository.save(user);
+        auditService.recordAs(user.getUsername(), user.getRole(), AuditAction.TWO_FACTOR_ENABLED, AuditService.SUCCESS, "USER", user.getUsername(), null, null);
 
         return AuthResponse.builder()
                 .username(user.getUsername())
@@ -197,6 +206,7 @@ public class AuthService {
         user.setTwoFactorEnabled(false);
         user.setTwoFactorSecret(null);
         userRepository.save(user);
+        auditService.recordAs(user.getUsername(), user.getRole(), AuditAction.TWO_FACTOR_DISABLED, AuditService.SUCCESS, "USER", user.getUsername(), null, null);
 
         return AuthResponse.builder()
                 .username(user.getUsername())
@@ -236,6 +246,7 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException(messageService.getMessage("user.not_found", username)));
         user.revokeAllTokens();
         userRepository.save(user);
+        auditService.record(AuditAction.LOGOUT_EVERYWHERE, "USER", user.getUsername(), null, null);
     }
 
     public String getLogoutMessage() {

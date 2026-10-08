@@ -246,6 +246,15 @@ Klink is multi-tenant: every customer company is a workspace.
 - PostgreSQL, Redis and RabbitMQ ports are bound to `127.0.0.1` only (Redis has no password).
 - Tokens carry a per-account version: a password reset, or `POST /api/v1/auth/logout-all`, immediately invalidates every token issued before. Tokens issued before this feature existed keep working until then. `/auth/logout` only ends the session in the current browser.
 
+### 🧾 Audit Trail
+
+Every sensitive action is written to an append-only audit trail: who (user, role, IP, user agent), what, to which target, in which workspace, when, and whether it succeeded or was refused.
+
+- **Recorded:** sign-ins (successful and failed), registration, password reset, sign-out everywhere, 2FA changes; platform-admin actions (role changes, user deletion, API-key decisions, customer creation, quota changes); workspace creation, member and invitation changes, permission-matrix edits; deletion, status changes and report exports of workspace links; **every time a platform admin reads a customer's workspace, links, permissions or analytics without being a member**; and refused attempts (`ACCESS_DENIED`).
+- **Not recorded:** link creation and redirects (see analytics), and ordinary members reading their own workspace's data.
+- **Who can read it:** platform admins see everything (`GET /api/v1/admin/audit`, **Denetim Kaydı** tab); a workspace admin sees their own workspace's trail, including platform-admin access to it (`GET /api/v1/workspaces/{id}/audit`, **Etkinlik Kaydı** tab). Filters: actor, action, outcome, workspace, date range.
+- **Tamper resistance:** the application can only add events; on PostgreSQL a database trigger also rejects `UPDATE`. Old events are deleted after `AUDIT_RETENTION_DAYS` (default 365, `0` keeps everything). Events are written in their own transaction, so a refused or rolled-back operation is still recorded. Secrets are never stored; the forwarded-for header is kept separately from the address the server saw because clients can forge it.
+
 ### 📈 Metrics
 
 Prometheus metrics are exposed at `/actuator/prometheus` and require an admin JWT (`Authorization: Bearer <token>`):
