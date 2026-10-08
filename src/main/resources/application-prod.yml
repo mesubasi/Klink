@@ -69,6 +69,11 @@ spring:
           max-interval: 10000ms
 
 app:
+  # Never create the well-known demo accounts (admin/admin123, user/password) in production.
+  seed:
+    demo-users: ${SEED_DEMO_USERS:false}
+  auth:
+    require-email-verification: ${REQUIRE_EMAIL_VERIFICATION:true}
   domain: ${APP_DOMAIN:https://klink.to}
   jwt:
     secret: ${JWT_SECRET}
@@ -76,6 +81,8 @@ app:
   frontend:
     preview-url: ${FRONTEND_PREVIEW_URL:https://klink.to/preview/%s}
     invite-url: ${FRONTEND_INVITE_URL:https://klink.to/invite/%s}
+    verify-url: ${FRONTEND_VERIFY_URL:https://klink.to/verify-email/%s}
+    reset-url: ${FRONTEND_RESET_URL:https://klink.to/reset-password/%s}
   invitation:
     expiry-days: ${INVITATION_EXPIRY_DAYS:7}
   cors:

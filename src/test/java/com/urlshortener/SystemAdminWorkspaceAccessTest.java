@@ -31,6 +31,7 @@ class SystemAdminWorkspaceAccessTest {
     private WorkspaceMemberRepository memberRepository;
     private UserRepository userRepository;
     private WorkspaceService service;
+    private com.urlshortener.service.QuotaService quotaService;
 
     private UUID workspaceId;
     private Workspace workspace;
@@ -41,7 +42,9 @@ class SystemAdminWorkspaceAccessTest {
         workspaceRepository = mock(WorkspaceRepository.class);
         memberRepository = mock(WorkspaceMemberRepository.class);
         userRepository = mock(UserRepository.class);
-        service = new WorkspaceService(workspaceRepository, memberRepository, userRepository, mock(UrlMappingRepository.class));
+        quotaService = mock(com.urlshortener.service.QuotaService.class);
+        service = new WorkspaceService(workspaceRepository, memberRepository, userRepository, mock(UrlMappingRepository.class),
+                quotaService, mock(com.urlshortener.service.EmailVerificationPolicy.class));
 
         workspaceId = UUID.randomUUID();
         customerManager = UserAccount.builder().id(UUID.randomUUID()).username("mudur").email("mudur@a.com").build();
@@ -135,5 +138,36 @@ class SystemAdminWorkspaceAccessTest {
         assertEquals(1, all.size());
         assertEquals(4L, all.get(0).getMemberCount());
         assertEquals("mudur", all.get(0).getOwnerUsername());
+    }
+
+    @Test
+    void onlySystemAdminsCanChangeQuotasAndZeroMeansUnlimited() {
+        loginAs("mudur", "ROLE_USER");
+        assertThrows(SecurityException.class, () -> service.updateQuota(workspaceId, 5, 5));
+
+        loginAs("root", "ROLE_ADMIN");
+        when(workspaceRepository.save(workspace)).thenReturn(workspace);
+        WorkspaceResponse updated = service.updateQuota(workspaceId, 25, 0);
+
+        assertEquals(25, updated.getMaxMembers());
+        assertNull(updated.getMaxLinks());
+    }
+
+    @Test
+    void customerWorkspacesAreCreatedByAdminsWithPlanDefaultsOrOverrides() {
+        loginAs("mudur", "ROLE_USER");
+        assertThrows(SecurityException.class, () -> service.createCustomerWorkspace("B Firması", null, null, null));
+
+        UserAccount root = loginAs("root", "ROLE_ADMIN");
+        when(workspaceRepository.existsBySlug(org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
+        when(workspaceRepository.save(org.mockito.ArgumentMatchers.any(Workspace.class))).thenAnswer(i -> i.getArgument(0));
+
+        Workspace created = service.createCustomerWorkspace("  B Firması ", "  ", 10, null);
+
+        assertEquals("B Firması", created.getName());
+        assertEquals(root.getUsername(), created.getOwner().getUsername());
+        assertNull(created.getDescription());
+        assertEquals(10, created.getMaxMembers());
+        verify(quotaService).applyDefaults(created);
     }
 }

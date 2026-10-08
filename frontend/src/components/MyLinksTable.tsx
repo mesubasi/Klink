@@ -483,6 +483,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         {/* Health Check Trigger */}
+                        {link.permissions?.canViewAnalytics !== false && (
                         <Button
                           variant="ghost"
                           size="iconSm"
@@ -493,6 +494,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                         >
                           <Activity className={`w-3.5 h-3.5 ${checkingCode === link.shortCode ? 'animate-spin text-emerald-600' : ''}`} />
                         </Button>
+                        )}
 
                         {/* Security Preview Trigger */}
                         <Button
@@ -532,6 +534,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                         </Button>
 
                         {/* Analytics Summary Modal Trigger */}
+                        {link.permissions?.canViewAnalytics !== false && (
                         <Button
                           variant="ghost"
                           size="iconSm"
@@ -541,8 +544,10 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                         >
                           <BarChart3 className="w-3.5 h-3.5" />
                         </Button>
+                        )}
 
                         {/* Delete Link */}
+                        {link.permissions?.canDeleteLink !== false && (
                         <Button
                           variant="ghost"
                           size="iconSm"
@@ -552,6 +557,7 @@ export const MyLinksTable: React.FC<MyLinksTableProps> = ({
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

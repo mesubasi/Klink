@@ -65,6 +65,7 @@ public class UrlShortenerService {
     private final WorkspacePermissionService workspacePermissionService;
     private final UrlVariantRepository urlVariantRepository;
     private final AbTestService abTestService;
+    private final QuotaService quotaService;
 
     @Value("${app.domain:http://localhost:8080}")
     private String domain;
@@ -88,7 +89,9 @@ public class UrlShortenerService {
                                WorkspaceMemberRepository workspaceMemberRepository,
                                WorkspacePermissionService workspacePermissionService,
                                UrlVariantRepository urlVariantRepository,
-                               AbTestService abTestService) {
+                               AbTestService abTestService,
+                               QuotaService quotaService) {
+        this.quotaService = quotaService;
         this.urlMappingRepository = urlMappingRepository;
         this.clickAnalyticsRepository = clickAnalyticsRepository;
         this.userRepository = userRepository;
@@ -188,6 +191,10 @@ public class UrlShortenerService {
                 }
                 throw e;
             }
+        }
+
+        if (workspace != null) {
+            quotaService.checkLinkQuota(workspace);
         }
 
         if (workspace != null && webhookUrl != null
@@ -567,6 +574,7 @@ public class UrlShortenerService {
         return result;
     }
 
+    @Transactional(readOnly = true)
     public List<ShortenResponse> getAllUrls() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
@@ -585,6 +593,7 @@ public class UrlShortenerService {
         return Collections.emptyList();
     }
 
+    @Transactional(readOnly = true)
     public List<ShortenResponse> getMyUrls() {
         UserAccount user = getCurrentAuthenticatedUser();
         if (user == null) {
@@ -599,6 +608,7 @@ public class UrlShortenerService {
     private static final int MAX_PAGE_SIZE = 100;
     private static final java.util.Set<String> SORTABLE_FIELDS = java.util.Set.of("createdAt", "clickCount", "shortCode");
 
+    @Transactional(readOnly = true)
     public PagedResponse<ShortenResponse> searchMyUrls(String query, String filter, int page, int size, String sortBy, boolean descending) {
         UserAccount user = getCurrentAuthenticatedUser();
         if (user == null) {
@@ -639,6 +649,7 @@ public class UrlShortenerService {
         return urlMappingRepository.getStatsByUsername(user.getUsername());
     }
 
+    @Transactional
     public ShortenResponse checkHealth(String shortCode) {
         UrlMapping mapping = urlMappingRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(messageService.getMessage("url.not_found", shortCode)));
@@ -648,6 +659,7 @@ public class UrlShortenerService {
         return buildShortenResponse(updated);
     }
 
+    @Transactional
     public List<ShortenResponse> checkAllMyUrlsHealth() {
         UserAccount user = getCurrentAuthenticatedUser();
         if (user == null) {
@@ -1091,6 +1103,7 @@ public class UrlShortenerService {
             builder.variants(variantResponses);
         }
 
+        builder.permissions(workspacePermissionService.getLinkPermissions(mapping));
         return builder.build();
     }
 

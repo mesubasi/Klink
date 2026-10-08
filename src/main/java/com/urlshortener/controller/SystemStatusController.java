@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/admin/system")
+@PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "Sistem ve Altyapı İzleme (Redis & RabbitMQ)", description = "Redis önbellek sunucusu durumu ve RabbitMQ kuyruk mesaj sayısı kontrol servisleri")
 public class SystemStatusController {
 

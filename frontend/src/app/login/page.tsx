@@ -168,6 +168,11 @@ export default function LoginPage() {
                         className="pl-9 text-xs h-10 bg-zinc-50 focus:bg-white"
                       />
                     </div>
+                    <div className="text-right">
+                      <Link href="/forgot-password" className="text-[11px] text-zinc-500 hover:text-zinc-900 hover:underline">
+                        Şifremi unuttum
+                      </Link>
+                    </div>
                   </div>
 
                   {errorMsg && (

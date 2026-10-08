@@ -24,8 +24,22 @@ public class EmailService {
 
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
 
-    @Value("${spring.mail.username:noreply@klink.local}")
-    private String fromEmail;
+    /** Sender address; falls back to the SMTP login when that is an email address, then to a placeholder. */
+    @Value("${app.mail.from:}")
+    private String configuredFrom;
+
+    @Value("${spring.mail.username:}")
+    private String smtpUsername;
+
+    private String fromAddress() {
+        if (configuredFrom != null && !configuredFrom.isBlank()) {
+            return configuredFrom.trim();
+        }
+        if (smtpUsername != null && smtpUsername.contains("@")) {
+            return smtpUsername.trim();
+        }
+        return "noreply@klink.local";
+    }
 
     public EmailService(ObjectProvider<JavaMailSender> mailSenderProvider) {
         this.mailSenderProvider = mailSenderProvider;
@@ -58,7 +72,7 @@ public class EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromEmail);
+            helper.setFrom(fromAddress());
             helper.setTo(recipientEmail);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
@@ -96,7 +110,7 @@ public class EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromEmail);
+            helper.setFrom(fromAddress());
             helper.setTo(recipientEmail);
             helper.setSubject("Klink: " + workspaceName + " çalışma alanına davet edildiniz");
             helper.setText(htmlBody, true);
@@ -107,6 +121,59 @@ public class EmailService {
             log.warn("⚠️ Çalışma alanı daveti gönderilemedi ({}): {}", recipientEmail, e.getMessage());
             return false;
         }
+    }
+
+    private boolean sendHtml(String to, String subject, String htmlBody, String logLabel) {
+        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+        if (mailSender == null) {
+            log.info("📧 [Simüle E-posta] {} hazırlandı (SMTP devre dışı): Kime: {}", logLabel, to);
+            return false;
+        }
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress());
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+            mailSender.send(message);
+            log.info("📧 [E-posta Gönderildi] {}: Kime: {}", logLabel, to);
+            return true;
+        } catch (Exception e) {
+            log.warn("⚠️ {} gönderilemedi ({}): {}", logLabel, to, e.getMessage());
+            return false;
+        }
+    }
+
+    private String actionMailHtml(String title, String intro, String buttonLabel, String url, String footnote) {
+        return "<!DOCTYPE html><html><body style='font-family: Arial, sans-serif; background-color: #f9f9fb; padding: 24px;'>"
+                + "<div style='max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 28px;'>"
+                + "<h2 style='margin: 0 0 12px; font-size: 20px; color: #111827;'>" + HtmlUtils.htmlEscape(title) + "</h2>"
+                + "<p style='color: #4b5563; font-size: 14px; line-height: 1.6;'>" + HtmlUtils.htmlEscape(intro) + "</p>"
+                + "<p style='margin: 24px 0;'><a href='" + HtmlUtils.htmlEscape(url) + "' style='background: #111827; color: #ffffff; padding: 12px 20px; border-radius: 10px; text-decoration: none; font-size: 14px;'>"
+                + HtmlUtils.htmlEscape(buttonLabel) + "</a></p>"
+                + "<p style='color: #6b7280; font-size: 12px;'>" + HtmlUtils.htmlEscape(footnote) + "</p>"
+                + "<p style='color: #9ca3af; font-size: 11px; margin-top: 24px; text-align: center;'>Klink &copy; 2026</p>"
+                + "</div></body></html>";
+    }
+
+    /** Async so that account creation and "forgot password" respond in the same time whether or not the mail goes out. */
+    @Async
+    public void sendEmailVerification(String to, String username, String verifyUrl) {
+        String html = actionMailHtml("E-posta adresinizi doğrulayın",
+                "Merhaba " + username + ", Klink hesabınızı etkinleştirmek için e-posta adresinizi doğrulayın.",
+                "E-postamı Doğrula", verifyUrl,
+                "Bu bağlantı 24 saat geçerlidir. Bu hesabı siz oluşturmadıysanız bu e-postayı yok sayabilirsiniz.");
+        sendHtml(to, "Klink: e-posta adresinizi doğrulayın", html, "E-posta doğrulama");
+    }
+
+    @Async
+    public void sendPasswordReset(String to, String username, String resetUrl) {
+        String html = actionMailHtml("Parolanızı sıfırlayın",
+                "Merhaba " + username + ", hesabınız için parola sıfırlama talebi aldık.",
+                "Parolamı Sıfırla", resetUrl,
+                "Bu bağlantı 1 saat geçerlidir ve yalnızca bir kez kullanılabilir. Talebi siz yapmadıysanız bu e-postayı yok sayın; parolanız değişmez.");
+        sendHtml(to, "Klink: parola sıfırlama", html, "Parola sıfırlama");
     }
 
     private String buildBrokenLinkHtml(String shortCode, String originalUrl, String errorMessage, String timeStr) {

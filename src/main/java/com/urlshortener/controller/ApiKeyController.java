@@ -8,6 +8,7 @@ import com.urlshortener.service.ApiKeyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -47,6 +48,7 @@ public class ApiKeyController {
     }
 
     // Admin Endpoints
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin/api-keys")
     @Operation(summary = "Admin: Tüm API Başvurularını Listele", description = "Opsiyonel olarak ?status=PENDING/APPROVED/REJECTED/REVOKED filtresi alır")
     public ResponseEntity<List<ApiKeyResponse>> getAllApplications(@RequestParam(required = false) ApiKeyStatus status) {
@@ -54,6 +56,7 @@ public class ApiKeyController {
         return ResponseEntity.ok(list);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/api-keys/{id}/approve")
     @Operation(summary = "Admin: API Başvurusunu Onayla", description = "Başvuruyu onaylayarak kl_live_ formatında anahtar üretir ve hız limiti tanımlar")
     public ResponseEntity<ApiKeyResponse> approveApplication(@PathVariable UUID id, @RequestBody(required = false) ApiKeyActionRequest request) {
@@ -61,6 +64,7 @@ public class ApiKeyController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/api-keys/{id}/reject")
     @Operation(summary = "Admin: API Başvurusunu Reddet", description = "Reddedilme gerekçesi ile birlikte başvuruyu reddeder")
     public ResponseEntity<ApiKeyResponse> rejectApplication(@PathVariable UUID id, @RequestBody(required = false) ApiKeyActionRequest request) {
@@ -68,6 +72,7 @@ public class ApiKeyController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/api-keys/{id}/revoke")
     @Operation(summary = "Admin: API Anahtarını İptal Et", description = "Kötüye kullanılan veya süresi dolan anahtarı askıya alır/iptal eder")
     public ResponseEntity<ApiKeyResponse> revokeApiKey(@PathVariable UUID id) {

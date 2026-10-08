@@ -33,6 +33,11 @@ public class Workspace implements Serializable {
     @Column(nullable = false)
     private Long createdAt;
 
+    /** Plan limits; null means unlimited. */
+    private Integer maxMembers;
+
+    private Integer maxLinks;
+
     public Workspace() {}
 
     public Workspace(UUID id, String name, String description, String slug, UserAccount owner, Long createdAt) {
@@ -74,6 +79,11 @@ public class Workspace implements Serializable {
             return new Workspace(id, name, description, slug, owner, createdAt);
         }
     }
+
+    public Integer getMaxMembers() { return maxMembers; }
+    public void setMaxMembers(Integer maxMembers) { this.maxMembers = maxMembers; }
+    public Integer getMaxLinks() { return maxLinks; }
+    public void setMaxLinks(Integer maxLinks) { this.maxLinks = maxLinks; }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

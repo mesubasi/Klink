@@ -39,6 +39,9 @@ public class UserAccount implements Serializable {
     @Column(nullable = false)
     private Long createdAt;
 
+    @Column(nullable = false)
+    private boolean emailVerified = false;
+
     public UserAccount() {}
 
     public UserAccount(UUID id, String username, String email, String password, String role, boolean twoFactorEnabled, String twoFactorSecret, Long createdAt) {
@@ -75,6 +78,7 @@ public class UserAccount implements Serializable {
         private boolean twoFactorEnabled = false;
         private String twoFactorSecret;
         private Long createdAt;
+        private boolean emailVerified = false;
 
         public Builder id(UUID id) { this.id = id; return this; }
         public Builder username(String username) { this.username = username; return this; }
@@ -84,9 +88,12 @@ public class UserAccount implements Serializable {
         public Builder twoFactorEnabled(boolean twoFactorEnabled) { this.twoFactorEnabled = twoFactorEnabled; return this; }
         public Builder twoFactorSecret(String twoFactorSecret) { this.twoFactorSecret = twoFactorSecret; return this; }
         public Builder createdAt(Long createdAt) { this.createdAt = createdAt; return this; }
+        public Builder emailVerified(boolean emailVerified) { this.emailVerified = emailVerified; return this; }
 
         public UserAccount build() {
-            return new UserAccount(id, username, email, password, role, twoFactorEnabled, twoFactorSecret, createdAt);
+            UserAccount account = new UserAccount(id, username, email, password, role, twoFactorEnabled, twoFactorSecret, createdAt);
+            account.setEmailVerified(emailVerified);
+            return account;
         }
     }
 
@@ -106,4 +113,6 @@ public class UserAccount implements Serializable {
     public void setTwoFactorSecret(String twoFactorSecret) { this.twoFactorSecret = twoFactorSecret; }
     public Long getCreatedAt() { return createdAt; }
     public void setCreatedAt(Long createdAt) { this.createdAt = createdAt; }
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
 }
